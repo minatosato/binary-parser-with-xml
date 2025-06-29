@@ -119,3 +119,32 @@ TEST(JsonValueTest, NestedStructures) {
     
     EXPECT_EQ(person["address"]["city"].getString(), "Boston");
 }
+
+TEST(JsonValueTest, PrettyPrint) {
+    // Test pretty printing
+    JsonValue obj;
+    obj.set("name", JsonValue("John"));
+    obj.set("age", JsonValue(30));
+    
+    JsonValue items;
+    items.pushBack(JsonValue("apple"));
+    items.pushBack(JsonValue("banana"));
+    obj.set("items", items);
+    
+    // Test compact (default)
+    std::string compact = obj.toString(false);
+    EXPECT_TRUE(compact.find("\n") == std::string::npos);  // No newlines
+    
+    // Test pretty print
+    std::string pretty = obj.toString(true);
+    EXPECT_TRUE(pretty.find("\n") != std::string::npos);  // Has newlines
+    EXPECT_TRUE(pretty.find("  \"name\"") != std::string::npos);  // Has indentation
+    
+    // Test empty object pretty print
+    JsonValue empty_obj = JsonValue::createObject();
+    EXPECT_EQ(empty_obj.toString(true), "{}");
+    
+    // Test empty array pretty print
+    JsonValue empty_arr = JsonValue::createArray();
+    EXPECT_EQ(empty_arr.toString(true), "[]");
+}

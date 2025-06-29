@@ -59,7 +59,11 @@ std::string JsonValue::escapeString(const std::string& str) const {
     return oss.str();
 }
 
-std::string JsonValue::toString() const {
+std::string JsonValue::toString(bool pretty) const {
+    return toStringInternal(pretty, 0);
+}
+
+std::string JsonValue::toStringInternal(bool pretty, int indent) const {
     if (std::holds_alternative<std::nullptr_t>(value_)) {
         return "null";
     }
@@ -85,26 +89,59 @@ std::string JsonValue::toString() const {
     }
     if (std::holds_alternative<std::shared_ptr<ArrayType>>(value_)) {
         std::ostringstream oss;
-        oss << "[";
         auto arr = std::get<std::shared_ptr<ArrayType>>(value_);
-        for (size_t i = 0; i < arr->size(); i++) {
-            if (i > 0) oss << ",";
-            oss << (*arr)[i]->toString();
+        
+        if (arr->empty()) {
+            return "[]";
         }
-        oss << "]";
+        
+        if (pretty) {
+            oss << "[";
+            for (size_t i = 0; i < arr->size(); i++) {
+                oss << "\n" << std::string((indent + 1) * 2, ' ');
+                oss << (*arr)[i]->toStringInternal(true, indent + 1);
+                if (i < arr->size() - 1) oss << ",";
+            }
+            oss << "\n" << std::string(indent * 2, ' ') << "]";
+        } else {
+            oss << "[";
+            for (size_t i = 0; i < arr->size(); i++) {
+                if (i > 0) oss << ",";
+                oss << (*arr)[i]->toStringInternal(false, 0);
+            }
+            oss << "]";
+        }
         return oss.str();
     }
     if (std::holds_alternative<std::shared_ptr<ObjectType>>(value_)) {
         std::ostringstream oss;
-        oss << "{";
         auto obj = std::get<std::shared_ptr<ObjectType>>(value_);
-        bool first = true;
-        for (const auto& [key, val] : *obj) {
-            if (!first) oss << ",";
-            first = false;
-            oss << "\"" << escapeString(key) << "\":" << val->toString();
+        
+        if (obj->empty()) {
+            return "{}";
         }
-        oss << "}";
+        
+        if (pretty) {
+            oss << "{";
+            bool first = true;
+            for (const auto& [key, val] : *obj) {
+                if (!first) oss << ",";
+                first = false;
+                oss << "\n" << std::string((indent + 1) * 2, ' ');
+                oss << "\"" << escapeString(key) << "\": ";
+                oss << val->toStringInternal(true, indent + 1);
+            }
+            oss << "\n" << std::string(indent * 2, ' ') << "}";
+        } else {
+            oss << "{";
+            bool first = true;
+            for (const auto& [key, val] : *obj) {
+                if (!first) oss << ",";
+                first = false;
+                oss << "\"" << escapeString(key) << "\":" << val->toStringInternal(false, 0);
+            }
+            oss << "}";
+        }
         return oss.str();
     }
     return "";

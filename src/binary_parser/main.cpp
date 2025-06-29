@@ -14,6 +14,7 @@ void printUsage(const char* program_name) {
     std::cout << "\nOptions:\n";
     std::cout << "  --big-endian, -b  : Parse as big-endian (default: little-endian)\n";
     std::cout << "  --json            : Output as JSON format\n";
+    std::cout << "  --pretty          : Pretty print JSON output\n";
     std::cout << "  -o <file>         : Output to file instead of stdout\n";
 }
 
@@ -101,6 +102,7 @@ int main(int argc, char* argv[]) {
     // Parse command line options
     binary_parser::Endianness endianness = binary_parser::Endianness::LITTLE;
     bool output_json = false;
+    bool pretty_print = false;
     std::string output_file;
     
     for (int i = 3; i < argc; i++) {
@@ -109,6 +111,8 @@ int main(int argc, char* argv[]) {
             endianness = binary_parser::Endianness::BIG;
         } else if (arg == "--json") {
             output_json = true;
+        } else if (arg == "--pretty") {
+            pretty_print = true;
         } else if (arg == "-o" && i + 1 < argc) {
             output_file = argv[++i];
         }
@@ -149,7 +153,7 @@ int main(int argc, char* argv[]) {
             options.include_type_info = false;  // Can be made configurable later
             
             JsonValue json = converter.convert(*parsed, options);
-            std::string json_str = json.toString();
+            std::string json_str = json.toString(pretty_print);
             
             if (!output_file.empty()) {
                 // Write to file

@@ -37,7 +37,7 @@ public:
     Type getType() const;
 
     // 文字列への変換
-    std::string toString() const;
+    std::string toString(bool pretty = false) const;
 
     // 配列操作
     void pushBack(const JsonValue& value);
@@ -74,6 +74,7 @@ private:
 
     ValueType value_;
     std::string escapeString(const std::string& str) const;
+    std::string toStringInternal(bool pretty, int indent) const;
 };
 
 #endif // JSON_VALUE_H
