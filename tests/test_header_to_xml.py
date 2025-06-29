@@ -47,5 +47,46 @@ class TestHeaderToXMLConverter(unittest.TestCase):
             os.unlink(header_file)
 
 
+    def test_struct_with_union(self):
+        header_content = """
+        #include <stdint.h>
+        
+        struct StructWithUnion {
+            uint32_t type;
+            union {
+                uint32_t int_value;
+                float float_value;
+            } data;
+        };
+        """
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+            f.write(header_content)
+            header_file = f.name
+        
+        try:
+            converter = HeaderToXMLConverter()
+            xml_string = converter.convert(header_file, "StructWithUnion")
+            
+            root = ET.fromstring(xml_string)
+            self.assertEqual(root.tag, 'struct')
+            self.assertEqual(root.get('name'), 'StructWithUnion')
+            
+            type_field = root.find("./field[@name='type']")
+            self.assertIsNotNone(type_field)
+            self.assertEqual(type_field.get('type'), 'uint32_t')
+            
+            union_field = root.find("./field[@name='data']")
+            self.assertIsNotNone(union_field)
+            
+            union_elem = union_field.find('union')
+            self.assertIsNotNone(union_elem)
+            
+            union_fields = union_elem.findall('field')
+            self.assertEqual(len(union_fields), 2)
+            
+        finally:
+            os.unlink(header_file)
+
 if __name__ == '__main__':
     unittest.main()
