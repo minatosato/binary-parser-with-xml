@@ -373,7 +373,7 @@ class HeaderToXMLConverter:
         
         return offset - current_offset
     
-    def _parse_union_body(self, body, union_elem, current_offset=0, packed=False):
+    def _parse_union_body(self, body, union_elem, offset=0, packed=False):
         max_size = 0
         lines = body.strip().split('\n')
         i = 0
@@ -433,6 +433,7 @@ class HeaderToXMLConverter:
                 
                 field_elem.set('size', str(field_size))
                 max_size = max(max_size, field_size)
+                i += 1
                 continue
             
             field_match = re.match(r'(\w+)\s+(\w+)\s*;', line)
