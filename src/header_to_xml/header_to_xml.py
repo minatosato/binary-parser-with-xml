@@ -325,10 +325,29 @@ class HeaderToXMLConverter:
     def _parse_union_body(self, body, union_elem, current_offset=0, packed=False):
         max_size = 0
         lines = body.strip().split('\n')
+        i = 0
         
-        for line in lines:
-            line = line.strip()
+        while i < len(lines):
+            line = lines[i].strip()
             if not line or line.startswith('//'):
+                i += 1
+                continue
+            
+            # Check for nested struct in union
+            if 'struct' in line and '{' in line:
+                struct_body, end_idx = self._extract_block(lines, i)
+                field_name = self._extract_field_name(lines[end_idx])
+                
+                field_elem = ET.SubElement(union_elem, 'field')
+                field_elem.set('name', field_name)
+                field_elem.set('offset', str(0))
+                
+                struct_elem = ET.SubElement(field_elem, 'struct')
+                struct_size = self._parse_struct_body(struct_body, struct_elem, 0, packed)
+                field_elem.set('size', str(struct_size))
+                
+                max_size = max(max_size, struct_size)
+                i = end_idx + 1
                 continue
             
             # Check for array in union
@@ -338,7 +357,7 @@ class HeaderToXMLConverter:
                 field_elem = ET.SubElement(union_elem, 'field')
                 field_elem.set('name', field_name)
                 field_elem.set('array_size', array_size)
-                field_elem.set('offset', str(current_offset))
+                field_elem.set('offset', str(0))  # Union fields are relative to union start
                 
                 # Check if array element is typedef
                 if field_type in self.typedef_map:
@@ -371,7 +390,7 @@ class HeaderToXMLConverter:
                 field_type, field_name = field_match.groups()
                 field_elem = ET.SubElement(union_elem, 'field')
                 field_elem.set('name', field_name)
-                field_elem.set('offset', str(current_offset))
+                field_elem.set('offset', str(0))  # Union fields are relative to union start
                 
                 # Check if it's a typedef or known struct
                 if field_type in self.typedef_map:
@@ -395,6 +414,8 @@ class HeaderToXMLConverter:
                     type_size = self.type_sizes.get(field_type, 4)
                     field_elem.set('size', str(type_size))
                     max_size = max(max_size, type_size)
+            
+            i += 1
         
         return max_size
     

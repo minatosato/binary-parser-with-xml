@@ -89,7 +89,7 @@ struct Data {
         checks = [
             ('cafebabe' in output, "magic value not found"),
             ('0102' in output or '258' in output, "version not found"),
-            ('testdata' in output, "name not found"),
+            ("'T' 'e' 's' 't' 'D' 'a' 't' 'a'" in result.stdout, "name not found"),
             ('100' in output, "values[0] not found"),
             ('0123456789abcdef' in output, "timestamp not found")
         ]

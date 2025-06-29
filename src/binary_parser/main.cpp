@@ -42,6 +42,38 @@ void printParsedField(const binary_parser::ParsedField& field, int indent = 0) {
                 std::cout << std::dec << std::any_cast<float>(field.value);
             } else if (field.value.type() == typeid(double)) {
                 std::cout << std::dec << std::any_cast<double>(field.value);
+            } else if (field.value.type() == typeid(std::vector<uint8_t>)) {
+                auto vec = std::any_cast<std::vector<uint8_t>>(field.value);
+                std::cout << "[";
+                for (size_t i = 0; i < vec.size() && i < 16; ++i) {
+                    if (i > 0) std::cout << " ";
+                    if (vec[i] >= 32 && vec[i] < 127) {
+                        std::cout << "'" << static_cast<char>(vec[i]) << "'";
+                    } else {
+                        std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0') 
+                                  << static_cast<int>(vec[i]);
+                    }
+                }
+                if (vec.size() > 16) std::cout << " ...";
+                std::cout << "]";
+            } else if (field.value.type() == typeid(std::vector<uint16_t>)) {
+                auto vec = std::any_cast<std::vector<uint16_t>>(field.value);
+                std::cout << "[";
+                for (size_t i = 0; i < vec.size() && i < 10; ++i) {
+                    if (i > 0) std::cout << ", ";
+                    std::cout << vec[i];
+                }
+                if (vec.size() > 10) std::cout << ", ...";
+                std::cout << "]";
+            } else if (field.value.type() == typeid(std::vector<uint32_t>)) {
+                auto vec = std::any_cast<std::vector<uint32_t>>(field.value);
+                std::cout << "[";
+                for (size_t i = 0; i < vec.size() && i < 10; ++i) {
+                    if (i > 0) std::cout << ", ";
+                    std::cout << vec[i];
+                }
+                if (vec.size() > 10) std::cout << ", ...";
+                std::cout << "]";
             } else {
                 std::cout << "<unknown type>";
             }
