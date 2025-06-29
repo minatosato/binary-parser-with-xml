@@ -16,6 +16,7 @@ class HeaderToXMLConverter:
             'int64_t': 8,
             'float': 4,
             'double': 8,
+            'char': 1,
         }
     
     def convert(self, header_file, root_struct_name, packed=False):
@@ -34,13 +35,16 @@ class HeaderToXMLConverter:
         if packed:
             root.set('packed', 'true')
         
-        self._parse_struct_body(struct_body, root)
+        # Calculate offsets and sizes
+        total_size = self._parse_struct_body(struct_body, root, 0, packed)
+        root.set('size', str(total_size))
         
         return self._prettify(root)
     
-    def _parse_struct_body(self, body, parent_elem):
+    def _parse_struct_body(self, body, parent_elem, current_offset=0, packed=False):
         lines = body.strip().split('\n')
         i = 0
+        offset = current_offset
         
         while i < len(lines):
             line = lines[i].strip()
@@ -55,31 +59,122 @@ class HeaderToXMLConverter:
                 
                 field_elem = ET.SubElement(parent_elem, 'field')
                 field_elem.set('name', field_name)
+                field_elem.set('offset', str(offset))
                 
                 union_elem = ET.SubElement(field_elem, 'union')
-                self._parse_struct_body(union_body, union_elem)
+                union_size = self._parse_union_body(union_body, union_elem, offset, packed)
+                field_elem.set('size', str(union_size))
                 
+                offset += union_size
                 i = end_idx + 1
+                
             elif 'struct' in line and '{' in line:
                 struct_body, end_idx = self._extract_block(lines, i)
                 field_name = self._extract_field_name(lines[end_idx])
                 
                 field_elem = ET.SubElement(parent_elem, 'field')
                 field_elem.set('name', field_name)
+                field_elem.set('offset', str(offset))
                 
                 struct_elem = ET.SubElement(field_elem, 'struct')
-                self._parse_struct_body(struct_body, struct_elem)
+                struct_size = self._parse_struct_body(struct_body, struct_elem, 0, packed)
+                field_elem.set('size', str(struct_size))
                 
+                offset += struct_size
                 i = end_idx + 1
+                
             else:
-                field_match = re.match(r'(\w+)\s+(\w+)\s*;', line)
-                if field_match:
-                    field_type, field_name = field_match.groups()
+                # Check for bitfield
+                bitfield_match = re.match(r'(\w+)\s+(\w+)\s*:\s*(\d+)\s*;', line)
+                if bitfield_match:
+                    field_type, field_name, bits = bitfield_match.groups()
                     field_elem = ET.SubElement(parent_elem, 'field')
                     field_elem.set('name', field_name)
                     field_elem.set('type', field_type)
+                    field_elem.set('bits', bits)
+                    # Bitfields don't increment offset in simple cases
+                    # This is a simplification - real bitfield layout is complex
+                else:
+                    # Check for array
+                    array_match = re.match(r'(\w+)\s+(\w+)\[(\d+)\]\s*;', line)
+                    if array_match:
+                        field_type, field_name, array_size = array_match.groups()
+                        field_elem = ET.SubElement(parent_elem, 'field')
+                        field_elem.set('name', field_name)
+                        field_elem.set('type', field_type)
+                        field_elem.set('array_size', array_size)
+                        field_elem.set('offset', str(offset))
+                        
+                        type_size = self.type_sizes.get(field_type, 4)
+                        field_size = type_size * int(array_size)
+                        field_elem.set('size', str(field_size))
+                        
+                        if not packed:
+                            offset = self._align_offset(offset + field_size, type_size)
+                        else:
+                            offset += field_size
+                    else:
+                        # Regular field
+                        field_match = re.match(r'(\w+)\s+(\w+)\s*;', line)
+                        if field_match:
+                            field_type, field_name = field_match.groups()
+                            field_elem = ET.SubElement(parent_elem, 'field')
+                            field_elem.set('name', field_name)
+                            field_elem.set('type', field_type)
+                            field_elem.set('offset', str(offset))
+                            
+                            type_size = self.type_sizes.get(field_type, 4)
+                            field_elem.set('size', str(type_size))
+                            
+                            if not packed:
+                                offset = self._align_offset(offset + type_size, type_size)
+                            else:
+                                offset += type_size
                 
                 i += 1
+        
+        # Align struct size
+        if not packed and offset > current_offset:
+            max_alignment = self._get_struct_alignment(parent_elem)
+            offset = self._align_offset(offset, max_alignment)
+        
+        return offset - current_offset
+    
+    def _parse_union_body(self, body, union_elem, current_offset=0, packed=False):
+        max_size = 0
+        lines = body.strip().split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('//'):
+                continue
+            
+            field_match = re.match(r'(\w+)\s+(\w+)\s*;', line)
+            if field_match:
+                field_type, field_name = field_match.groups()
+                field_elem = ET.SubElement(union_elem, 'field')
+                field_elem.set('name', field_name)
+                field_elem.set('type', field_type)
+                field_elem.set('offset', str(current_offset))
+                
+                type_size = self.type_sizes.get(field_type, 4)
+                field_elem.set('size', str(type_size))
+                max_size = max(max_size, type_size)
+        
+        return max_size
+    
+    def _get_struct_alignment(self, struct_elem):
+        max_alignment = 1
+        for field in struct_elem.findall('.//field[@type]'):
+            field_type = field.get('type')
+            if field_type in self.type_sizes:
+                max_alignment = max(max_alignment, self.type_sizes[field_type])
+        return max_alignment
+    
+    def _align_offset(self, offset, alignment):
+        if alignment == 0:
+            return offset
+        return ((offset + alignment - 1) // alignment) * alignment
     
     def _extract_block(self, lines, start_idx):
         brace_count = 0

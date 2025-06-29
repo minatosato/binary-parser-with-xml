@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<struct name="TestStruct">
+  <field name="header" type="uint32_t"/>
+  <field name="version" type="uint16_t"/>
+  <field name="value">
+    <union>
+      <field name="int_data" type="uint32_t"/>
+      <field name="float_data" type="float"/>
+    </union>
+  </field>
+  <field name="flags" type="uint8_t"/>
+</struct>
