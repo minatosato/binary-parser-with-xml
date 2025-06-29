@@ -107,6 +107,46 @@ TEST_F(BinaryParserTest, ParseStructWithArray) {
     std::remove("test_array_struct.xml");
 }
 
+TEST_F(BinaryParserTest, ParseStructWithBitfield) {
+    // Create test XML file with bitfields
+    const char* xml_content = R"(<?xml version="1.0" ?>
+<struct name="BitfieldStruct" size="4">
+  <field name="flag1" type="uint32_t" offset="0" size="4" bits="1" bit_offset="0"/>
+  <field name="flag2" type="uint32_t" offset="0" size="4" bits="1" bit_offset="1"/>
+  <field name="value" type="uint32_t" offset="0" size="4" bits="14" bit_offset="2"/>
+  <field name="reserved" type="uint32_t" offset="0" size="4" bits="16" bit_offset="16"/>
+</struct>)";
+    
+    std::ofstream out("test_bitfield_struct.xml");
+    out << xml_content;
+    out.close();
+    
+    // Parse XML
+    XmlStructParser xml_parser;
+    auto struct_info = xml_parser.parse("test_bitfield_struct.xml");
+    ASSERT_NE(struct_info, nullptr);
+    
+    // Create test binary data
+    // Layout: flag1(1) | flag2(1) | value(14) | reserved(16)
+    // Binary: 1 | 1 | 00000000101010 | 0000000011111111
+    //       = 11 00000000101010 0000000011111111
+    //       = 0xC02A00FF
+    uint32_t test_data = 0xC02A00FF;
+    
+    // Parse binary data
+    BinaryParser parser;
+    auto parsed = parser.parse(reinterpret_cast<uint8_t*>(&test_data), sizeof(test_data), *struct_info);
+    ASSERT_NE(parsed, nullptr);
+    
+    // Verify bitfield values
+    EXPECT_EQ(BinaryParser::getValue<uint32_t>(parsed->fields["flag1"]), 1);
+    EXPECT_EQ(BinaryParser::getValue<uint32_t>(parsed->fields["flag2"]), 1);
+    EXPECT_EQ(BinaryParser::getValue<uint32_t>(parsed->fields["value"]), 42);  // 0x2A = 42
+    EXPECT_EQ(BinaryParser::getValue<uint32_t>(parsed->fields["reserved"]), 255); // 0xFF = 255
+    
+    std::remove("test_bitfield_struct.xml");
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

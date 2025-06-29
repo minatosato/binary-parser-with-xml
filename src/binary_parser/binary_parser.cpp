@@ -48,6 +48,9 @@ ParsedField BinaryParser::parseField(
     } else if (field_info.array_size > 1) {
         // Parse array
         parsed_field.value = parseArray(data, actual_offset, field_info);
+    } else if (field_info.bits > 0) {
+        // Parse bitfield
+        parsed_field.value = parseBitfield(data, actual_offset, field_info);
     } else {
         // Parse primitive value
         parsed_field.value = parseValue(data, actual_offset, field_info);
@@ -197,6 +200,82 @@ std::any BinaryParser::parseArray(
         
         default:
             throw std::runtime_error("Unsupported array element type");
+    }
+}
+
+std::any BinaryParser::parseBitfield(
+    const uint8_t* data,
+    size_t offset,
+    const FieldInfo& field_info) {
+    
+    // Read the full value from memory
+    const uint8_t* ptr = data + offset;
+    uint64_t full_value = 0;
+    
+    // Read based on the field size
+    switch (field_info.size) {
+        case 1:
+            full_value = *ptr;
+            break;
+        case 2: {
+            uint16_t temp;
+            std::memcpy(&temp, ptr, sizeof(temp));
+            full_value = temp;
+            break;
+        }
+        case 4: {
+            uint32_t temp;
+            std::memcpy(&temp, ptr, sizeof(temp));
+            full_value = temp;
+            break;
+        }
+        case 8:
+            std::memcpy(&full_value, ptr, sizeof(full_value));
+            break;
+        default:
+            throw std::runtime_error("Unsupported bitfield size");
+    }
+    
+    // Extract the bitfield value
+    // Create mask with the specified number of bits
+    uint64_t mask = (1ULL << field_info.bits) - 1;
+    
+    // Shift right to get the bits we want, then apply mask
+    uint64_t bitfield_value = (full_value >> field_info.bit_offset) & mask;
+    
+    // Return the value as the appropriate type
+    switch (field_info.type) {
+        case FieldType::UINT8:
+            return static_cast<uint8_t>(bitfield_value);
+        case FieldType::UINT16:
+            return static_cast<uint16_t>(bitfield_value);
+        case FieldType::UINT32:
+            return static_cast<uint32_t>(bitfield_value);
+        case FieldType::UINT64:
+            return bitfield_value;
+        case FieldType::INT8:
+            // Sign extend if needed
+            if (field_info.bits < 8 && (bitfield_value & (1ULL << (field_info.bits - 1)))) {
+                bitfield_value |= ~((1ULL << field_info.bits) - 1);
+            }
+            return static_cast<int8_t>(bitfield_value);
+        case FieldType::INT16:
+            if (field_info.bits < 16 && (bitfield_value & (1ULL << (field_info.bits - 1)))) {
+                bitfield_value |= ~((1ULL << field_info.bits) - 1);
+            }
+            return static_cast<int16_t>(bitfield_value);
+        case FieldType::INT32:
+            if (field_info.bits < 32 && (bitfield_value & (1ULL << (field_info.bits - 1)))) {
+                bitfield_value |= ~((1ULL << field_info.bits) - 1);
+            }
+            return static_cast<int32_t>(bitfield_value);
+        case FieldType::INT64:
+            if (field_info.bits < 64 && (bitfield_value & (1ULL << (field_info.bits - 1)))) {
+                bitfield_value |= ~((1ULL << field_info.bits) - 1);
+            }
+            return static_cast<int64_t>(bitfield_value);
+        default:
+            throw std::runtime_error("Unsupported bitfield type");
     }
 }
 

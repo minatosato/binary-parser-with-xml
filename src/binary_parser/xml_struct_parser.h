@@ -35,6 +35,7 @@ struct FieldInfo {
     size_t size;
     size_t array_size = 1;  // 1 if not an array
     int bits = 0;  // 0 if not a bitfield
+    int bit_offset = 0;  // bit offset within the field
     
     // For struct/union fields
     std::vector<std::unique_ptr<FieldInfo>> sub_fields;

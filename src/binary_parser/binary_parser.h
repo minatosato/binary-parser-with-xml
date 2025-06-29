@@ -65,6 +65,12 @@ private:
         size_t offset,
         const FieldInfo& field_info
     );
+    
+    std::any parseBitfield(
+        const uint8_t* data,
+        size_t offset,
+        const FieldInfo& field_info
+    );
 };
 
 } // namespace binary_parser

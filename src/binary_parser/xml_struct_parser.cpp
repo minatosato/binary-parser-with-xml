@@ -42,6 +42,7 @@ std::unique_ptr<FieldInfo> XmlStructParser::parseField(const pugi::xml_node& nod
     field->size = node.attribute("size").as_uint();
     field->array_size = node.attribute("array_size").as_uint(1);
     field->bits = node.attribute("bits").as_int(0);
+    field->bit_offset = node.attribute("bit_offset").as_int(0);
     
     // Check if it has a type attribute
     if (node.attribute("type")) {

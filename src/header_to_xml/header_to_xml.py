@@ -28,6 +28,7 @@ class HeaderToXMLConverter:
         self.typedef_map = {}
         self.struct_map = {}
         self.processed_files = set()
+        self._bitfield_state = {}
         
         # Process includes recursively
         self._process_header_file(header_file)
@@ -115,6 +116,7 @@ class HeaderToXMLConverter:
         lines = body.strip().split('\n')
         i = 0
         offset = current_offset
+        last_was_bitfield = False
         
         while i < len(lines):
             line = lines[i].strip()
@@ -162,9 +164,40 @@ class HeaderToXMLConverter:
                     field_elem.set('name', field_name)
                     field_elem.set('type', field_type)
                     field_elem.set('bits', bits)
-                    # Bitfields don't increment offset in simple cases
-                    # This is a simplification - real bitfield layout is complex
+                    
+                    # Track bitfield offset within the current field type
+                    if not hasattr(self, '_bitfield_state'):
+                        self._bitfield_state = {}
+                    
+                    key = (offset, field_type)
+                    if key not in self._bitfield_state:
+                        self._bitfield_state[key] = {
+                            'bit_offset': 0,
+                            'base_offset': offset
+                        }
+                    
+                    field_elem.set('bit_offset', str(self._bitfield_state[key]['bit_offset']))
+                    field_elem.set('offset', str(self._bitfield_state[key]['base_offset']))
+                    
+                    # Update bit offset for next bitfield
+                    self._bitfield_state[key]['bit_offset'] += int(bits)
+                    
+                    # Set size based on base type
+                    type_size = self.type_sizes.get(field_type, 4)
+                    field_elem.set('size', str(type_size))
+                    last_was_bitfield = True
                 else:
+                    # Check if previous field was a bitfield and update offset
+                    if last_was_bitfield and hasattr(self, '_bitfield_state'):
+                        # Find the bitfield group that was just completed
+                        max_offset = offset
+                        for key, state in self._bitfield_state.items():
+                            if key[0] <= offset:
+                                type_size = self.type_sizes.get(key[1], 4)
+                                max_offset = max(max_offset, key[0] + type_size)
+                        offset = max_offset
+                    last_was_bitfield = False
+                    
                     # Check for array
                     array_match = re.match(r'(\w+)\s+(\w+)\[(\d+)\]\s*;', line)
                     if array_match:
