@@ -190,6 +190,32 @@ class TestHeaderToXMLConverter(unittest.TestCase):
             
         finally:
             os.unlink(header_file)
+    
+    def test_struct_with_includes(self):
+        converter = HeaderToXMLConverter()
+        header_file = os.path.join(os.path.dirname(__file__), 'test_includes', 'main_struct.h')
+        
+        xml_string = converter.convert(header_file, "ComplexStruct")
+        root = ET.fromstring(xml_string)
+        
+        fields = root.findall('field')
+        self.assertEqual(len(fields), 4)
+        
+        # Check id field
+        self.assertEqual(fields[0].get('name'), 'id')
+        self.assertEqual(fields[0].get('type'), 'uint32_t')
+        
+        # Check position field (should be expanded)
+        position_field = fields[1]
+        self.assertEqual(position_field.get('name'), 'position')
+        position_struct = position_field.find('struct')
+        self.assertIsNotNone(position_struct)
+        
+        # Check color field (should be expanded)
+        color_field = fields[2]
+        self.assertEqual(color_field.get('name'), 'color')
+        color_struct = color_field.find('struct')
+        self.assertIsNotNone(color_struct)
 
 if __name__ == '__main__':
     unittest.main()

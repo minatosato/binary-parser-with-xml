@@ -1,4 +1,5 @@
 import re
+import os
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
@@ -18,13 +19,32 @@ class HeaderToXMLConverter:
             'double': 8,
             'char': 1,
         }
+        self.typedef_map = {}
+        self.struct_map = {}
+        self.processed_files = set()
     
     def convert(self, header_file, root_struct_name, packed=False):
-        with open(header_file, 'r') as f:
-            content = f.read()
+        # Reset state for new conversion
+        self.typedef_map = {}
+        self.struct_map = {}
+        self.processed_files = set()
         
-        struct_pattern = rf'struct\s+{root_struct_name}\s*{{([^{{}}]*(?:{{[^{{}}]*}}[^{{}}]*)*)}}'
-        match = re.search(struct_pattern, content, re.DOTALL)
+        # Process includes recursively
+        self._process_header_file(header_file)
+        
+        # Find the struct definition
+        struct_pattern = rf'struct\s+{root_struct_name}\s*{{([^{{}}]*(?:{{[^{{}}]*}}[^{{}}]*)*)}}'  
+        
+        match = None
+        for content in self.struct_map.values():
+            match = re.search(struct_pattern, content, re.DOTALL)
+            if match:
+                break
+        
+        if not match:
+            # Try to find in all processed content
+            all_content = '\n'.join(self.struct_map.values())
+            match = re.search(struct_pattern, all_content, re.DOTALL)
         
         if not match:
             raise ValueError(f"Struct '{root_struct_name}' not found in header file")
@@ -40,6 +60,44 @@ class HeaderToXMLConverter:
         root.set('size', str(total_size))
         
         return self._prettify(root)
+    
+    def _process_header_file(self, header_file):
+        if header_file in self.processed_files:
+            return
+        
+        self.processed_files.add(header_file)
+        
+        with open(header_file, 'r') as f:
+            content = f.read()
+        
+        self.struct_map[header_file] = content
+        
+        # Extract typedefs
+        typedef_pattern = r'typedef\s+struct\s*{([^}]+)}\s*(\w+)\s*;'
+        for match in re.finditer(typedef_pattern, content, re.DOTALL):
+            struct_body, type_name = match.groups()
+            self.typedef_map[type_name] = struct_body
+        
+        # Process includes
+        include_pattern = r'#include\s*["<]([^">]+)[">]'
+        for match in re.finditer(include_pattern, content):
+            include_file = match.group(1)
+            
+            # Skip system headers
+            if include_file.startswith('<') or not include_file.endswith('.h'):
+                continue
+            
+            # Try to find the include file
+            include_path = None
+            base_dir = os.path.dirname(header_file)
+            
+            # Try relative path first
+            potential_path = os.path.join(base_dir, include_file)
+            if os.path.exists(potential_path):
+                include_path = potential_path
+            
+            if include_path:
+                self._process_header_file(include_path)
     
     def _parse_struct_body(self, body, parent_elem, current_offset=0, packed=False):
         lines = body.strip().split('\n')
@@ -120,16 +178,23 @@ class HeaderToXMLConverter:
                             field_type, field_name = field_match.groups()
                             field_elem = ET.SubElement(parent_elem, 'field')
                             field_elem.set('name', field_name)
-                            field_elem.set('type', field_type)
                             field_elem.set('offset', str(offset))
                             
-                            type_size = self.type_sizes.get(field_type, 4)
-                            field_elem.set('size', str(type_size))
-                            
-                            if not packed:
-                                offset = self._align_offset(offset + type_size, type_size)
+                            # Check if it's a typedef
+                            if field_type in self.typedef_map:
+                                struct_elem = ET.SubElement(field_elem, 'struct')
+                                struct_size = self._parse_struct_body(self.typedef_map[field_type], struct_elem, 0, packed)
+                                field_elem.set('size', str(struct_size))
+                                offset += struct_size
                             else:
-                                offset += type_size
+                                field_elem.set('type', field_type)
+                                type_size = self.type_sizes.get(field_type, 4)
+                                field_elem.set('size', str(type_size))
+                                
+                                if not packed:
+                                    offset = self._align_offset(offset + type_size, type_size)
+                                else:
+                                    offset += type_size
                 
                 i += 1
         
