@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <variant>
 #include <stdexcept>
+#include <fstream>
 
 JsonValue::JsonValue() : value_(nullptr) {}
 
@@ -259,4 +260,29 @@ const JsonValue::ObjectType& JsonValue::getObject() const {
         throw std::runtime_error("Not an object");
     }
     return *std::get<std::shared_ptr<ObjectType>>(value_);
+}
+
+// File I/O operations
+void JsonValue::writeToFile(const std::string& filename) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file for writing: " + filename);
+    }
+    
+    // Always use pretty print for file output
+    file << toString(true) << std::endl;
+    file.close();
+}
+
+JsonValue JsonValue::parseFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file for reading: " + filename);
+    }
+    
+    // Note: This is a placeholder implementation
+    // A full JSON parser would be needed for complete functionality
+    // For now, just return null
+    file.close();
+    return JsonValue();
 }

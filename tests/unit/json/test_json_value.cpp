@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <fstream>
+#include <cstdio>
 #include "json/json_value.h"
 
 TEST(JsonValueTest, NullValue) {
@@ -147,4 +149,33 @@ TEST(JsonValueTest, PrettyPrint) {
     // Test empty array pretty print
     JsonValue empty_arr = JsonValue::createArray();
     EXPECT_EQ(empty_arr.toString(true), "[]");
+}
+
+TEST(JsonValueTest, FileIO) {
+    // Test writeToFile
+    JsonValue obj;
+    obj.set("test", JsonValue("data"));
+    obj.set("number", JsonValue(42));
+    
+    // Write to file
+    std::string test_file = "test_json_io.json";
+    obj.writeToFile(test_file);
+    
+    // Read file back and verify it was written
+    std::ifstream file(test_file);
+    EXPECT_TRUE(file.is_open());
+    
+    std::string content;
+    std::string line;
+    while (std::getline(file, line)) {
+        content += line + "\n";
+    }
+    file.close();
+    
+    // Should contain pretty-printed JSON
+    EXPECT_TRUE(content.find("\"test\": \"data\"") != std::string::npos);
+    EXPECT_TRUE(content.find("\"number\": 42") != std::string::npos);
+    
+    // Clean up
+    std::remove(test_file.c_str());
 }
