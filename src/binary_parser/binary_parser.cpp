@@ -84,15 +84,15 @@ ParsedField BinaryParser::parseField(
         throw std::runtime_error(error_msg);
     }
     
-    if (field_info.type == FieldType::STRUCT || field_info.type == FieldType::UNION) {
-        // Parse sub-fields
+    if (field_info.array_size > 1) {
+        // Parse array (including struct arrays)
+        parsed_field.value = parseArray(data, data_size, actual_offset, field_info);
+    } else if (field_info.type == FieldType::STRUCT || field_info.type == FieldType::UNION) {
+        // Parse sub-fields for single struct/union
         for (const auto& sub_field : field_info.sub_fields) {
             parsed_field.sub_fields[sub_field->name] = 
                 parseField(data, data_size, actual_offset, *sub_field);
         }
-    } else if (field_info.array_size > 1) {
-        // Parse array
-        parsed_field.value = parseArray(data, data_size, actual_offset, field_info);
     } else if (field_info.bits > 0) {
         // Parse bitfield
         parsed_field.value = parseBitfield(data, actual_offset, field_info);

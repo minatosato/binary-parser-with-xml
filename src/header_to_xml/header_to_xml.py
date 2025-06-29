@@ -210,21 +210,38 @@ class HeaderToXMLConverter:
                 
             elif 'struct' in line and '{' in line:
                 struct_body, end_idx = self._extract_block(lines, i)
-                field_name = self._extract_field_name(lines[end_idx])
+                end_line = lines[end_idx] if end_idx < len(lines) else ''
                 
-                field_elem = ET.SubElement(parent_elem, 'field')
-                field_elem.set('name', field_name)
-                field_elem.set('offset', str(offset))
-                
-                struct_elem = ET.SubElement(field_elem, 'struct')
-                struct_size = self._parse_struct_body(struct_body, struct_elem, 0, packed)
-                field_elem.set('size', str(struct_size))
-                
-                # For anonymous structs, advance offset only if it has a name
-                if field_name != 'unnamed':
-                    offset += struct_size
+                # Check if it's an array of structs
+                array_match = re.search(r'}\s*(\w*)\s*\[(\w+)\]\s*;', end_line)
+                if array_match:
+                    field_name = array_match.group(1) if array_match.group(1) else 'unnamed'
+                    array_size = array_match.group(2)
+                    expanded_size = self._expand_macro(array_size)
+                    
+                    field_elem = ET.SubElement(parent_elem, 'field')
+                    field_elem.set('name', field_name)
+                    field_elem.set('offset', str(offset))
+                    field_elem.set('array_size', expanded_size)
+                    
+                    struct_elem = ET.SubElement(field_elem, 'struct')
+                    element_size = self._parse_struct_body(struct_body, struct_elem, 0, packed)
+                    field_size = element_size * int(expanded_size)
+                    field_elem.set('size', str(field_size))
+                    
+                    offset += field_size
                 else:
-                    # Anonymous struct members are at the parent level
+                    # Regular struct (not array)
+                    field_name = self._extract_field_name(end_line)
+                    
+                    field_elem = ET.SubElement(parent_elem, 'field')
+                    field_elem.set('name', field_name)
+                    field_elem.set('offset', str(offset))
+                    
+                    struct_elem = ET.SubElement(field_elem, 'struct')
+                    struct_size = self._parse_struct_body(struct_body, struct_elem, 0, packed)
+                    field_elem.set('size', str(struct_size))
+                    
                     offset += struct_size
                 i = end_idx + 1
                 
@@ -288,20 +305,34 @@ class HeaderToXMLConverter:
                         if isinstance(resolved_type_info, tuple):
                             # It's a typedef struct/union
                             typedef_type, typedef_body = resolved_type_info
-                            # For arrays of typedef structs, don't expand inline
-                            field_elem.set('type', field_type)
-                            # Calculate element size
-                            temp_elem = ET.Element('temp')
+                            # For arrays of typedef structs, parse the structure
                             if typedef_type == 'struct':
-                                element_size = self._parse_struct_body(typedef_body, temp_elem, 0, packed)
+                                struct_elem = ET.SubElement(field_elem, 'struct')
+                                element_size = self._parse_struct_body(typedef_body, struct_elem, 0, packed)
                             else:
-                                element_size = self._parse_union_body(typedef_body, temp_elem, 0, packed)
+                                union_elem = ET.SubElement(field_elem, 'union')
+                                element_size = self._parse_union_body(typedef_body, union_elem, 0, packed)
                             field_size = element_size * int(expanded_size)
                         else:
-                            # It's a simple type
-                            field_elem.set('type', resolved_type_info)
-                            type_size = self.type_sizes.get(resolved_type_info, 4)
-                            field_size = type_size * int(expanded_size)
+                            # Check if it's a struct type
+                            struct_found = False
+                            for content in self.struct_map.values():
+                                struct_pattern = rf'struct\s+{field_type}\s*\{{'
+                                if re.search(struct_pattern, content):
+                                    struct_found = True
+                                    # Extract and parse the struct
+                                    match = re.search(rf'struct\s+{field_type}\s*\{{((?:[^{{}}]|(?:\{{[^{{}}]*\}}))*)\}}', content, re.DOTALL)
+                                    if match:
+                                        struct_elem = ET.SubElement(field_elem, 'struct')
+                                        element_size = self._parse_struct_body(match.group(1), struct_elem, 0, packed)
+                                        field_size = element_size * int(expanded_size)
+                                    break
+                            
+                            if not struct_found:
+                                # It's a simple type
+                                field_elem.set('type', resolved_type_info)
+                                type_size = self.type_sizes.get(resolved_type_info, 4)
+                                field_size = type_size * int(expanded_size)
                         
                         field_elem.set('size', str(field_size))
                         

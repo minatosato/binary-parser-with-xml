@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<struct name="ComplexTestData" size="80">
+<struct name="ComplexTestData" size="92">
   <field name="id" offset="0" type="uint32_t" size="4"/>
   <field name="name" array_size="32" offset="4" type="char" size="32"/>
   <field name="position" offset="36" size="12">
@@ -11,7 +11,7 @@
   </field>
   <field name="flags" offset="48" type="uint16_t" size="2"/>
   <field name="values" array_size="5" offset="50" type="float" size="20"/>
-  <field name="unnamed" offset="72" size="6">
+  <field name="items" offset="72" array_size="3" size="18">
     <struct>
       <field name="type" offset="0" type="uint8_t" size="1"/>
       <field name="count" offset="1" type="uint16_t" size="2"/>

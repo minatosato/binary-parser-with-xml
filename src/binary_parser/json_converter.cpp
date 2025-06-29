@@ -217,28 +217,28 @@ std::string JsonConverter::getTypeName(const std::any& value) {
 bool JsonConverter::isCharArray(const std::vector<uint8_t>& vec) {
     if (vec.empty()) return false;
     
-    // Check if it contains a null terminator
+    // Check if it contains a null terminator within reasonable range
     bool has_null = false;
-    for (size_t i = 0; i < vec.size(); i++) {
+    size_t printable_count = 0;
+    
+    for (size_t i = 0; i < vec.size() && i < 1024; i++) {
         if (vec[i] == 0) {
             has_null = true;
-            // Check if null terminator is at the end or followed only by zeros
-            for (size_t j = i + 1; j < vec.size(); j++) {
-                if (vec[j] != 0) return false;
-            }
-            break;
+            // If we found null and have some printable characters, it's likely a string
+            return printable_count > 0;
         }
         // Check if it's a printable character or common control character
-        if (vec[i] < 32 || vec[i] > 126) {
-            // Allow common control characters
-            if (vec[i] != '\t' && vec[i] != '\n' && vec[i] != '\r' && 
-                vec[i] != '\b' && vec[i] != '\f') {
-                return false;
-            }
+        if ((vec[i] >= 32 && vec[i] <= 126) || vec[i] == '\t' || vec[i] == '\n' || 
+            vec[i] == '\r' || vec[i] == '\b' || vec[i] == '\f') {
+            printable_count++;
+        } else {
+            // Non-printable character before null - not a string
+            return false;
         }
     }
     
-    return has_null || vec.size() <= 256;  // Assume small arrays might be strings
+    // No null terminator found, but if it's mostly printable and small, might be a string
+    return vec.size() <= 1024 && printable_count >= vec.size() * 0.8;
 }
 
 std::string JsonConverter::charArrayToString(const std::vector<uint8_t>& vec) {
