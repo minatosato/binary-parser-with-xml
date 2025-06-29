@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <algorithm>
+#include <climits>
 
 namespace binary_parser {
 
@@ -70,7 +71,11 @@ ParsedField BinaryParser::parseField(
     size_t actual_offset = base_offset + field_info.offset;
     
     if (actual_offset + field_info.size > data_size) {
-        throw std::runtime_error("Field offset + size exceeds data size");
+        std::string error_msg = "Field offset + size exceeds data size: " +
+                                field_info.name + " at offset " + std::to_string(actual_offset) +
+                                " with size " + std::to_string(field_info.size) +
+                                " exceeds data size " + std::to_string(data_size);
+        throw std::runtime_error(error_msg);
     }
     
     if (field_info.type == FieldType::STRUCT || field_info.type == FieldType::UNION) {
@@ -81,7 +86,7 @@ ParsedField BinaryParser::parseField(
         }
     } else if (field_info.array_size > 1) {
         // Parse array
-        parsed_field.value = parseArray(data, actual_offset, field_info);
+        parsed_field.value = parseArray(data, data_size, actual_offset, field_info);
     } else if (field_info.bits > 0) {
         // Parse bitfield
         parsed_field.value = parseBitfield(data, actual_offset, field_info);
@@ -182,6 +187,7 @@ std::any BinaryParser::parseValue(
 
 std::any BinaryParser::parseArray(
     const uint8_t* data,
+    size_t data_size,
     size_t offset,
     const FieldInfo& field_info) {
     
@@ -265,6 +271,33 @@ std::any BinaryParser::parseArray(
                     std::memcpy(&value, data + offset + i * element_size, sizeof(value));
                 }
                 array.push_back(value);
+            }
+            return array;
+        }
+        
+        case FieldType::UNKNOWN:
+        case FieldType::STRUCT:
+        case FieldType::UNION: {
+            // For unknown types (typedefs), structs, and unions, parse as array of ParsedFields
+            std::vector<std::any> array;
+            array.reserve(field_info.array_size);
+            
+            // Each element should have sub_fields
+            if (!field_info.sub_fields.empty()) {
+                for (size_t i = 0; i < field_info.array_size; i++) {
+                    ParsedField element;
+                    element.name = std::to_string(i);
+                    for (const auto& sub_field : field_info.sub_fields) {
+                        element.sub_fields[sub_field->name] = 
+                            parseField(data, data_size, offset + i * element_size, *sub_field);
+                    }
+                    array.push_back(element);
+                }
+            } else {
+                // If no sub_fields, just skip this array
+                for (size_t i = 0; i < field_info.array_size; i++) {
+                    array.push_back(std::any{});  // Empty element
+                }
             }
             return array;
         }

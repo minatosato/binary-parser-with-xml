@@ -1,56 +1,64 @@
 #include "xml_struct_parser.h"
-#include <pugixml.hpp>
+#include <tinyxml2.h>
 #include <stdexcept>
 
 namespace binary_parser {
 
 std::unique_ptr<StructInfo> XmlStructParser::parse(const std::string& xml_file) {
-    pugi::xml_document doc;
-    pugi::xml_parse_result result = doc.load_file(xml_file.c_str());
+    tinyxml2::XMLDocument doc;
+    tinyxml2::XMLError result = doc.LoadFile(xml_file.c_str());
     
-    if (!result) {
-        throw std::runtime_error("Failed to parse XML file: " + std::string(result.description()));
+    if (result != tinyxml2::XML_SUCCESS) {
+        throw std::runtime_error("Failed to parse XML file: " + std::string(doc.ErrorStr()));
     }
     
-    pugi::xml_node root = doc.child("struct");
+    tinyxml2::XMLElement* root = doc.FirstChildElement("struct");
     if (!root) {
         throw std::runtime_error("No struct element found in XML");
     }
     
     auto struct_info = std::make_unique<StructInfo>();
-    struct_info->name = root.attribute("name").as_string();
-    struct_info->size = root.attribute("size").as_uint();
-    struct_info->packed = root.attribute("packed").as_bool(false);
+    
+    const char* name_attr = root->Attribute("name");
+    if (name_attr) struct_info->name = name_attr;
+    
+    struct_info->size = root->UnsignedAttribute("size", 0);
+    struct_info->packed = root->BoolAttribute("packed", false);
     
     parseSubFields(root, struct_info->fields);
     
     return struct_info;
 }
 
-void XmlStructParser::parseSubFields(const pugi::xml_node& parent, 
+void XmlStructParser::parseSubFields(const tinyxml2::XMLElement* parent, 
                                     std::vector<std::unique_ptr<FieldInfo>>& fields) {
-    for (pugi::xml_node field_node : parent.children("field")) {
+    for (const tinyxml2::XMLElement* field_node = parent->FirstChildElement("field");
+         field_node;
+         field_node = field_node->NextSiblingElement("field")) {
         fields.push_back(parseField(field_node));
     }
 }
 
-std::unique_ptr<FieldInfo> XmlStructParser::parseField(const pugi::xml_node& node) {
+std::unique_ptr<FieldInfo> XmlStructParser::parseField(const tinyxml2::XMLElement* node) {
     auto field = std::make_unique<FieldInfo>();
     
-    field->name = node.attribute("name").as_string();
-    field->offset = node.attribute("offset").as_uint();
-    field->size = node.attribute("size").as_uint();
-    field->array_size = node.attribute("array_size").as_uint(1);
-    field->bits = node.attribute("bits").as_int(0);
-    field->bit_offset = node.attribute("bit_offset").as_int(0);
+    const char* name_attr = node->Attribute("name");
+    if (name_attr) field->name = name_attr;
+    
+    field->offset = node->UnsignedAttribute("offset", 0);
+    field->size = node->UnsignedAttribute("size", 0);
+    field->array_size = node->UnsignedAttribute("array_size", 1);
+    field->bits = node->IntAttribute("bits", 0);
+    field->bit_offset = node->IntAttribute("bit_offset", 0);
     
     // Check if it has a type attribute
-    if (node.attribute("type")) {
-        field->type = parseFieldType(node.attribute("type").as_string());
+    const char* type_attr = node->Attribute("type");
+    if (type_attr) {
+        field->type = parseFieldType(type_attr);
     } else {
         // Check for struct or union sub-elements
-        pugi::xml_node struct_node = node.child("struct");
-        pugi::xml_node union_node = node.child("union");
+        const tinyxml2::XMLElement* struct_node = node->FirstChildElement("struct");
+        const tinyxml2::XMLElement* union_node = node->FirstChildElement("union");
         
         if (struct_node) {
             field->type = FieldType::STRUCT;

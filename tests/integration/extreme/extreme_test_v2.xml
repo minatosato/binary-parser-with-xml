@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<struct name="ExtremeTest" size="336">
+  <field name="signature" offset="0" type="uint32_t" size="4"/>
+  <field name="unnamed" offset="4" size="256">
+    <union>
+      <field name="timestamp" offset="4" type="uint64_t" size="8"/>
+      <field name="complex_data" offset="4" type="MiddleComplex" size="4"/>
+      <field name="packets" type="PacketUnion" array_size="3" offset="4" size="12"/>
+      <field name="raw_header" type="uint8_t" array_size="8" offset="4" size="8"/>
+      <field name="primary_layer" offset="4" type="LayerData" size="4"/>
+      <field name="palette" type="ColorData" array_size="16" offset="4" size="64"/>
+      <field name="indices" type="uint8_t" array_size="64" offset="4" size="64"/>
+      <field name="flags_combined" offset="4" type="uint32_t" size="4"/>
+      <field name="blob_data" type="uint8_t" array_size="256" offset="4" size="256"/>
+    </union>
+  </field>
+  <field name="unnamed" offset="260" size="64">
+    <struct>
+      <field name="unnamed" offset="0" size="64">
+        <union>
+          <field name="mix1" offset="0" type="MixedData" size="4"/>
+          <field name="bits" type="ControlBits" array_size="4" offset="0" size="16"/>
+          <field name="mask" offset="0" type="uint64_t" size="8"/>
+          <field name="value" offset="0" type="uint64_t" size="8"/>
+          <field name="table" type="uint16_t" array_size="32" offset="0" size="64"/>
+          <field name="color_map" type="ColorData" array_size="8" offset="0" size="32"/>
+          <field name="lookup" type="uint32_t" array_size="16" offset="0" size="64"/>
+        </union>
+      </field>
+    </struct>
+  </field>
+  <field name="unnamed" offset="324" size="8">
+    <union>
+      <field name="crc32" offset="324" type="uint32_t" size="4"/>
+      <field name="length" offset="324" type="uint16_t" size="2"/>
+      <field name="footer_raw" offset="324" type="uint64_t" size="8"/>
+    </union>
+  </field>
+</struct>

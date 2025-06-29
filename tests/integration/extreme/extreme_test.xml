@@ -1,0 +1,30 @@
+<?xml version="1.0" ?>
+<struct name="ExtremeTest" size="32">
+  <field name="signature" offset="0" type="uint32_t" size="4"/>
+  <field name="unnamed" offset="4" size="8">
+    <union>
+      <field name="timestamp" type="uint64_t" offset="4" size="8"/>
+      <field name="complex_data" type="MiddleComplex" offset="4" size="4"/>
+      <field name="primary_layer" type="LayerData" offset="4" size="4"/>
+      <field name="flags_combined" type="uint32_t" offset="4" size="4"/>
+    </union>
+  </field>
+  <field name="unnamed" offset="12" size="8">
+    <struct>
+      <field name="unnamed" offset="0" size="8">
+        <union>
+          <field name="mix1" type="MixedData" offset="0" size="4"/>
+          <field name="mask" type="uint64_t" offset="0" size="8"/>
+          <field name="value" type="uint64_t" offset="0" size="8"/>
+        </union>
+      </field>
+    </struct>
+  </field>
+  <field name="unnamed" offset="20" size="8">
+    <union>
+      <field name="crc32" type="uint32_t" offset="20" size="4"/>
+      <field name="length" type="uint16_t" offset="20" size="2"/>
+      <field name="footer_raw" type="uint64_t" offset="20" size="8"/>
+    </union>
+  </field>
+</struct>

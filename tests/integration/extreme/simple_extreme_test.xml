@@ -1,0 +1,10 @@
+<?xml version="1.0" ?>
+<struct name="ExtremeTest" size="472">
+  <field name="signature" offset="0" type="uint32_t" size="4"/>
+  <field name="unnamed" offset="8" size="464">
+    <union>
+      <field name="timestamp" offset="0" type="uint64_t" size="8"/>
+      <field name="raw_data" array_size="464" offset="0" type="uint8_t" size="464"/>
+    </union>
+  </field>
+</struct>

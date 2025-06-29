@@ -68,6 +68,7 @@ private:
     
     std::any parseArray(
         const uint8_t* data,
+        size_t data_size,
         size_t offset,
         const FieldInfo& field_info
     );

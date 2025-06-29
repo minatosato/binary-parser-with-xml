@@ -5,7 +5,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find packages
-find_package(pugixml CONFIG REQUIRED)
+find_package(tinyxml2 CONFIG)
+if(NOT tinyxml2_FOUND)
+    # Try to find TinyXML2 manually
+    find_path(TINYXML2_INCLUDE_DIR tinyxml2.h PATHS /opt/homebrew/include /usr/local/include)
+    find_library(TINYXML2_LIBRARY tinyxml2 PATHS /opt/homebrew/lib /usr/local/lib)
+    if(TINYXML2_INCLUDE_DIR AND TINYXML2_LIBRARY)
+        message(STATUS "Found TinyXML2: ${TINYXML2_LIBRARY}")
+    else()
+        message(FATAL_ERROR "TinyXML2 not found")
+    endif()
+endif()
 find_package(GTest CONFIG REQUIRED)
 
 # Binary parser library
@@ -18,9 +28,12 @@ target_include_directories(binary_parser PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/binary_parser
 )
 
-target_link_libraries(binary_parser PUBLIC
-    pugixml::pugixml
-)
+if(tinyxml2_FOUND)
+    target_link_libraries(binary_parser PUBLIC tinyxml2::tinyxml2)
+else()
+    target_include_directories(binary_parser PUBLIC ${TINYXML2_INCLUDE_DIR})
+    target_link_libraries(binary_parser PUBLIC ${TINYXML2_LIBRARY})
+endif()
 
 # Binary parser executable
 add_executable(parse_binary

@@ -85,11 +85,47 @@ class HeaderToXMLConverter:
         
         self.struct_map[header_file] = content
         
-        # Extract typedefs
-        typedef_pattern = r'typedef\s+struct\s*{([^}]+)}\s*(\w+)\s*;'
-        for match in re.finditer(typedef_pattern, content, re.DOTALL):
-            struct_body, type_name = match.groups()
-            self.typedef_map[type_name] = struct_body
+        # Extract typedefs - handle nested braces properly
+        # First, find all typedef declarations
+        typedef_pattern = r'typedef\s+(struct|union)\s*\{((?:[^{}]|(?:\{[^{}]*\}))*)\}\s*(\w+)\s*;'
+        
+        # Process the content to find typedefs with proper brace matching
+        pos = 0
+        while pos < len(content):
+            # Find the next typedef
+            typedef_match = re.search(r'typedef\s+(struct|union)\s*\{', content[pos:])
+            if not typedef_match:
+                break
+                
+            start_pos = pos + typedef_match.start()
+            struct_or_union = typedef_match.group(1)
+            
+            # Find the matching closing brace
+            brace_start = pos + typedef_match.end() - 1
+            brace_count = 1
+            current_pos = brace_start + 1
+            
+            while current_pos < len(content) and brace_count > 0:
+                if content[current_pos] == '{':
+                    brace_count += 1
+                elif content[current_pos] == '}':
+                    brace_count -= 1
+                current_pos += 1
+            
+            if brace_count == 0:
+                # Extract the body
+                body = content[brace_start + 1:current_pos - 1]
+                
+                # Find the type name after the closing brace
+                name_match = re.match(r'\s*(\w+)\s*;', content[current_pos:])
+                if name_match:
+                    type_name = name_match.group(1)
+                    self.typedef_map[type_name] = (struct_or_union, body)
+                    pos = current_pos + name_match.end()
+                else:
+                    pos = current_pos
+            else:
+                pos = start_pos + 1
         
         # Process includes
         include_pattern = r'#include\s*["<]([^">]+)[">]'
@@ -232,19 +268,48 @@ class HeaderToXMLConverter:
                             
                             # Check if it's a typedef
                             if field_type in self.typedef_map:
-                                struct_elem = ET.SubElement(field_elem, 'struct')
-                                struct_size = self._parse_struct_body(self.typedef_map[field_type], struct_elem, 0, packed)
+                                typedef_info = self.typedef_map[field_type]
+                                if isinstance(typedef_info, tuple):
+                                    typedef_type, typedef_body = typedef_info
+                                    if typedef_type == 'struct':
+                                        struct_elem = ET.SubElement(field_elem, 'struct')
+                                        struct_size = self._parse_struct_body(typedef_body, struct_elem, 0, packed)
+                                    else:  # union
+                                        struct_elem = ET.SubElement(field_elem, 'union')
+                                        struct_size = self._parse_union_body(typedef_body, struct_elem, offset, packed)
+                                else:
+                                    # Old format, assume struct
+                                    struct_elem = ET.SubElement(field_elem, 'struct')
+                                    struct_size = self._parse_struct_body(typedef_info, struct_elem, 0, packed)
                                 field_elem.set('size', str(struct_size))
                                 offset += struct_size
                             else:
-                                field_elem.set('type', field_type)
-                                type_size = self.type_sizes.get(field_type, 4)
-                                field_elem.set('size', str(type_size))
+                                # Check if it's a known struct type from includes
+                                struct_found = False
+                                for content in self.struct_map.values():
+                                    # Look for struct definitions
+                                    struct_pattern = rf'struct\s+{field_type}\s*{{'
+                                    if re.search(struct_pattern, content):
+                                        struct_found = True
+                                        # Extract and parse the struct
+                                        full_pattern = rf'struct\s+{field_type}\s*{{([^{{}}]*(?:{{[^{{}}]*}}[^{{}}]*)*)}}'
+                                        match = re.search(full_pattern, content, re.DOTALL)
+                                        if match:
+                                            struct_elem = ET.SubElement(field_elem, 'struct')
+                                            struct_size = self._parse_struct_body(match.group(1), struct_elem, 0, packed)
+                                            field_elem.set('size', str(struct_size))
+                                            offset += struct_size
+                                        break
                                 
-                                if not packed:
-                                    offset = self._align_offset(offset + type_size, type_size)
-                                else:
-                                    offset += type_size
+                                if not struct_found:
+                                    field_elem.set('type', field_type)
+                                    type_size = self.type_sizes.get(field_type, 4)
+                                    field_elem.set('size', str(type_size))
+                                    
+                                    if not packed:
+                                        offset = self._align_offset(offset + type_size, type_size)
+                                    else:
+                                        offset += type_size
                 
                 i += 1
         
@@ -264,17 +329,70 @@ class HeaderToXMLConverter:
             if not line or line.startswith('//'):
                 continue
             
+            # Check for array in union
+            array_match = re.match(r'(\w+)\s+(\w+)\[(\d+)\]\s*;', line)
+            if array_match:
+                field_type, field_name, array_size = array_match.groups()
+                field_elem = ET.SubElement(union_elem, 'field')
+                field_elem.set('name', field_name)
+                field_elem.set('array_size', array_size)
+                field_elem.set('offset', str(current_offset))
+                
+                # Check if array element is typedef
+                if field_type in self.typedef_map:
+                    typedef_info = self.typedef_map[field_type]
+                    if isinstance(typedef_info, tuple):
+                        typedef_type, typedef_body = typedef_info
+                        # For arrays of typedefs, we need to get the size once
+                        temp_elem = ET.Element('temp')
+                        if typedef_type == 'struct':
+                            element_size = self._parse_struct_body(typedef_body, temp_elem, 0, packed)
+                        else:
+                            element_size = self._parse_union_body(typedef_body, temp_elem, 0, packed)
+                    else:
+                        temp_elem = ET.Element('temp')
+                        element_size = self._parse_struct_body(typedef_info, temp_elem, 0, packed)
+                    # Don't expand typedef arrays - just set type
+                    field_elem.set('type', field_type)
+                    field_size = element_size * int(array_size)
+                else:
+                    field_elem.set('type', field_type)
+                    type_size = self.type_sizes.get(field_type, 4)
+                    field_size = type_size * int(array_size)
+                
+                field_elem.set('size', str(field_size))
+                max_size = max(max_size, field_size)
+                continue
+            
             field_match = re.match(r'(\w+)\s+(\w+)\s*;', line)
             if field_match:
                 field_type, field_name = field_match.groups()
                 field_elem = ET.SubElement(union_elem, 'field')
                 field_elem.set('name', field_name)
-                field_elem.set('type', field_type)
                 field_elem.set('offset', str(current_offset))
                 
-                type_size = self.type_sizes.get(field_type, 4)
-                field_elem.set('size', str(type_size))
-                max_size = max(max_size, type_size)
+                # Check if it's a typedef or known struct
+                if field_type in self.typedef_map:
+                    typedef_info = self.typedef_map[field_type]
+                    if isinstance(typedef_info, tuple):
+                        typedef_type, typedef_body = typedef_info
+                        if typedef_type == 'struct':
+                            struct_elem = ET.SubElement(field_elem, 'struct')
+                            struct_size = self._parse_struct_body(typedef_body, struct_elem, 0, packed)
+                        else:  # union
+                            struct_elem = ET.SubElement(field_elem, 'union')
+                            struct_size = self._parse_union_body(typedef_body, struct_elem, current_offset, packed)
+                    else:
+                        # Old format, assume struct
+                        struct_elem = ET.SubElement(field_elem, 'struct')
+                        struct_size = self._parse_struct_body(typedef_info, struct_elem, 0, packed)
+                    field_elem.set('size', str(struct_size))
+                    max_size = max(max_size, struct_size)
+                else:
+                    field_elem.set('type', field_type)
+                    type_size = self.type_sizes.get(field_type, 4)
+                    field_elem.set('size', str(type_size))
+                    max_size = max(max_size, type_size)
         
         return max_size
     

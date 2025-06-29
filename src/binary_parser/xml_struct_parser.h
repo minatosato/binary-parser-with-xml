@@ -6,8 +6,8 @@
 #include <memory>
 #include <cstdint>
 
-namespace pugi {
-    class xml_node;
+namespace tinyxml2 {
+    class XMLElement;
 }
 
 namespace binary_parser {
@@ -56,9 +56,9 @@ public:
     std::unique_ptr<StructInfo> parse(const std::string& xml_file);
     
 private:
-    std::unique_ptr<FieldInfo> parseField(const pugi::xml_node& node);
+    std::unique_ptr<FieldInfo> parseField(const tinyxml2::XMLElement* node);
     FieldType parseFieldType(const std::string& type_str);
-    void parseSubFields(const pugi::xml_node& parent, std::vector<std::unique_ptr<FieldInfo>>& fields);
+    void parseSubFields(const tinyxml2::XMLElement* parent, std::vector<std::unique_ptr<FieldInfo>>& fields);
 };
 
 } // namespace binary_parser
