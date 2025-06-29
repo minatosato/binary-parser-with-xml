@@ -1,0 +1,21 @@
+<?xml version="1.0" ?>
+<struct name="ComplexTestData" size="80">
+  <field name="id" offset="0" type="uint32_t" size="4"/>
+  <field name="name" array_size="32" offset="4" type="char" size="32"/>
+  <field name="position" offset="36" size="12">
+    <struct>
+      <field name="x" offset="0" type="int32_t" size="4"/>
+      <field name="y" offset="4" type="int32_t" size="4"/>
+      <field name="z" offset="8" type="int32_t" size="4"/>
+    </struct>
+  </field>
+  <field name="flags" offset="48" type="uint16_t" size="2"/>
+  <field name="values" array_size="5" offset="50" type="float" size="20"/>
+  <field name="unnamed" offset="72" size="6">
+    <struct>
+      <field name="type" offset="0" type="uint8_t" size="1"/>
+      <field name="count" offset="1" type="uint16_t" size="2"/>
+      <field name="padding" offset="4" type="uint8_t" size="1"/>
+    </struct>
+  </field>
+</struct>

@@ -12,8 +12,8 @@
   </field>
   <field name="data" offset="10" size="4">
     <union>
-      <field name="int_value" type="uint32_t" offset="10" size="4"/>
-      <field name="float_value" type="float" offset="10" size="4"/>
+      <field name="int_value" offset="0" type="uint32_t" size="4"/>
+      <field name="float_value" offset="0" type="float" size="4"/>
     </union>
   </field>
 </struct>

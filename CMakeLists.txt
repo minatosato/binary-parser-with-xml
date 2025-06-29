@@ -58,6 +58,8 @@ enable_testing()
 set(TEST_SOURCES
     tests/unit/json/test_json_value.cpp
     tests/unit/test_json_converter.cpp
+    tests/unit/test_json_error_handling.cpp
+    tests/unit/test_json_converter_edge_cases.cpp
     tests/unit/test_binary_parser.cpp
     tests/unit/test_binary_parser_endianness.cpp
     tests/unit/test_binary_parser_logic.cpp
@@ -91,3 +93,19 @@ endif()
 
 # テストの登録
 add_test(NAME unit_tests COMMAND run_tests)
+
+# 結合テストの登録
+add_test(NAME integration_test_basic 
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/run_integration_test.sh
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration
+)
+
+add_test(NAME integration_test_json 
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/run_integration_test_with_json.sh
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration
+)
+
+add_test(NAME integration_test_complex 
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/run_complex_integration_test.sh
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration
+)

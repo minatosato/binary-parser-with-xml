@@ -113,7 +113,7 @@ JsonValue JsonConverter::convertValue(const std::any& value) {
             }
             
             // Otherwise, convert as array
-            JsonValue arr;
+            JsonValue arr = JsonValue::createArray();
             for (uint8_t val : vec) {
                 arr.pushBack(JsonValue(static_cast<int>(val)));
             }
@@ -131,7 +131,7 @@ JsonValue JsonConverter::convertValue(const std::any& value) {
         
         if (value.type() == typeid(std::vector<uint32_t>)) {
             auto vec = std::any_cast<std::vector<uint32_t>>(value);
-            JsonValue arr;
+            JsonValue arr = JsonValue::createArray();
             for (uint32_t val : vec) {
                 arr.pushBack(JsonValue(static_cast<double>(val)));
             }
@@ -140,7 +140,7 @@ JsonValue JsonConverter::convertValue(const std::any& value) {
         
         if (value.type() == typeid(std::vector<uint64_t>)) {
             auto vec = std::any_cast<std::vector<uint64_t>>(value);
-            JsonValue arr;
+            JsonValue arr = JsonValue::createArray();
             for (uint64_t val : vec) {
                 arr.pushBack(JsonValue(static_cast<double>(val)));
             }
@@ -149,7 +149,7 @@ JsonValue JsonConverter::convertValue(const std::any& value) {
         
         if (value.type() == typeid(std::vector<float>)) {
             auto vec = std::any_cast<std::vector<float>>(value);
-            JsonValue arr;
+            JsonValue arr = JsonValue::createArray();
             for (float val : vec) {
                 arr.pushBack(JsonValue(static_cast<double>(val)));
             }
@@ -158,7 +158,7 @@ JsonValue JsonConverter::convertValue(const std::any& value) {
         
         if (value.type() == typeid(std::vector<double>)) {
             auto vec = std::any_cast<std::vector<double>>(value);
-            JsonValue arr;
+            JsonValue arr = JsonValue::createArray();
             for (double val : vec) {
                 arr.pushBack(JsonValue(val));
             }
@@ -168,11 +168,13 @@ JsonValue JsonConverter::convertValue(const std::any& value) {
         // Handle ParsedField arrays (for typedef arrays)
         if (value.type() == typeid(std::vector<std::any>)) {
             auto vec = std::any_cast<std::vector<std::any>>(value);
-            JsonValue arr;
+            JsonValue arr = JsonValue::createArray();
             for (const auto& elem : vec) {
-                // For now, just add empty objects
-                // This would need more complex handling for typedef arrays
-                arr.pushBack(JsonValue());
+                if (elem.type() == typeid(ParsedField)) {
+                    arr.pushBack(convertFieldSimple(std::any_cast<ParsedField>(elem)));
+                } else {
+                    arr.pushBack(convertValue(elem));
+                }
             }
             return arr;
         }
@@ -226,9 +228,13 @@ bool JsonConverter::isCharArray(const std::vector<uint8_t>& vec) {
             }
             break;
         }
-        // Check if it's a printable character
+        // Check if it's a printable character or common control character
         if (vec[i] < 32 || vec[i] > 126) {
-            return false;
+            // Allow common control characters
+            if (vec[i] != '\t' && vec[i] != '\n' && vec[i] != '\r' && 
+                vec[i] != '\b' && vec[i] != '\f') {
+                return false;
+            }
         }
     }
     

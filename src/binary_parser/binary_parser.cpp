@@ -128,7 +128,13 @@ std::any BinaryParser::parseValue(
         case FieldType::INT16: {
             int16_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            return needs_swap_ ? byteSwap16(value) : value;
+            if (needs_swap_) {
+                uint16_t temp;
+                std::memcpy(&temp, &value, sizeof(temp));
+                temp = byteSwap16(temp);
+                std::memcpy(&value, &temp, sizeof(value));
+            }
+            return value;
         }
         
         case FieldType::UINT32: {
@@ -140,7 +146,13 @@ std::any BinaryParser::parseValue(
         case FieldType::INT32: {
             int32_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            return needs_swap_ ? byteSwap32(value) : value;
+            if (needs_swap_) {
+                uint32_t temp;
+                std::memcpy(&temp, &value, sizeof(temp));
+                temp = byteSwap32(temp);
+                std::memcpy(&value, &temp, sizeof(value));
+            }
+            return value;
         }
         
         case FieldType::UINT64: {
@@ -152,7 +164,13 @@ std::any BinaryParser::parseValue(
         case FieldType::INT64: {
             int64_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            return needs_swap_ ? byteSwap64(value) : value;
+            if (needs_swap_) {
+                uint64_t temp;
+                std::memcpy(&temp, &value, sizeof(temp));
+                temp = byteSwap64(temp);
+                std::memcpy(&value, &temp, sizeof(value));
+            }
+            return value;
         }
         
         case FieldType::FLOAT: {
