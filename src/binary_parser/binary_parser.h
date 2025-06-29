@@ -30,8 +30,7 @@ struct ParsedStruct {
 
 class BinaryParser {
 public:
-    BinaryParser(Endianness endianness = Endianness::LITTLE) 
-        : endianness_(endianness) {}
+    BinaryParser(Endianness endianness = Endianness::LITTLE);
     
     // Parse binary data using struct definition from XML
     std::unique_ptr<ParsedStruct> parse(
@@ -89,6 +88,7 @@ public:
 
 private:
     Endianness endianness_;
+    bool needs_swap_;  // Cache endianness check result
 };
 
 } // namespace binary_parser

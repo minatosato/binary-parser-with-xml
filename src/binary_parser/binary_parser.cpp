@@ -13,9 +13,15 @@ static bool isLittleEndian() {
     return *reinterpret_cast<uint8_t*>(&test) == 1;
 }
 
-bool BinaryParser::needsByteSwap() const {
+BinaryParser::BinaryParser(Endianness endianness) 
+    : endianness_(endianness) {
+    // Cache endianness check at construction time
     bool systemIsLittleEndian = isLittleEndian();
-    return (endianness_ == Endianness::LITTLE) != systemIsLittleEndian;
+    needs_swap_ = (endianness_ == Endianness::LITTLE) != systemIsLittleEndian;
+}
+
+bool BinaryParser::needsByteSwap() const {
+    return needs_swap_;  // Return cached value
 }
 
 uint16_t BinaryParser::byteSwap16(uint16_t value) {
@@ -116,48 +122,42 @@ std::any BinaryParser::parseValue(
         case FieldType::UINT16: {
             uint16_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            if (needsByteSwap()) value = byteSwap16(value);
-            return value;
+            return needs_swap_ ? byteSwap16(value) : value;
         }
         
         case FieldType::INT16: {
             int16_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            if (needsByteSwap()) value = byteSwap16(value);
-            return value;
+            return needs_swap_ ? byteSwap16(value) : value;
         }
         
         case FieldType::UINT32: {
             uint32_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            if (needsByteSwap()) value = byteSwap32(value);
-            return value;
+            return needs_swap_ ? byteSwap32(value) : value;
         }
         
         case FieldType::INT32: {
             int32_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            if (needsByteSwap()) value = byteSwap32(value);
-            return value;
+            return needs_swap_ ? byteSwap32(value) : value;
         }
         
         case FieldType::UINT64: {
             uint64_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            if (needsByteSwap()) value = byteSwap64(value);
-            return value;
+            return needs_swap_ ? byteSwap64(value) : value;
         }
         
         case FieldType::INT64: {
             int64_t value;
             std::memcpy(&value, ptr, sizeof(value));
-            if (needsByteSwap()) value = byteSwap64(value);
-            return value;
+            return needs_swap_ ? byteSwap64(value) : value;
         }
         
         case FieldType::FLOAT: {
             float value;
-            if (needsByteSwap()) {
+            if (needs_swap_) {
                 uint32_t temp;
                 std::memcpy(&temp, ptr, sizeof(temp));
                 temp = byteSwap32(temp);
@@ -170,7 +170,7 @@ std::any BinaryParser::parseValue(
         
         case FieldType::DOUBLE: {
             double value;
-            if (needsByteSwap()) {
+            if (needs_swap_) {
                 uint64_t temp;
                 std::memcpy(&temp, ptr, sizeof(temp));
                 temp = byteSwap64(temp);
@@ -197,82 +197,73 @@ std::any BinaryParser::parseArray(
     switch (field_info.type) {
         case FieldType::UINT8:
         case FieldType::CHAR: {
-            std::vector<uint8_t> array;
-            array.reserve(field_info.array_size);
-            for (size_t i = 0; i < field_info.array_size; i++) {
-                array.push_back(data[offset + i]);
-            }
+            // Direct memory copy for byte arrays - much faster
+            std::vector<uint8_t> array(field_info.array_size);
+            std::memcpy(array.data(), data + offset, field_info.array_size);
             return array;
         }
         
         case FieldType::UINT16: {
-            std::vector<uint16_t> array;
-            array.reserve(field_info.array_size);
+            std::vector<uint16_t> array(field_info.array_size);
+            const bool swap = needs_swap_;  // Use cached value
             for (size_t i = 0; i < field_info.array_size; i++) {
                 uint16_t value;
                 std::memcpy(&value, data + offset + i * element_size, sizeof(value));
-                if (needsByteSwap()) value = byteSwap16(value);
-                array.push_back(value);
+                array[i] = swap ? byteSwap16(value) : value;
             }
             return array;
         }
         
         case FieldType::UINT32: {
-            std::vector<uint32_t> array;
-            array.reserve(field_info.array_size);
+            std::vector<uint32_t> array(field_info.array_size);
+            const bool swap = needs_swap_;
             for (size_t i = 0; i < field_info.array_size; i++) {
                 uint32_t value;
                 std::memcpy(&value, data + offset + i * element_size, sizeof(value));
-                if (needsByteSwap()) value = byteSwap32(value);
-                array.push_back(value);
+                array[i] = swap ? byteSwap32(value) : value;
             }
             return array;
         }
         
         case FieldType::UINT64: {
-            std::vector<uint64_t> array;
-            array.reserve(field_info.array_size);
+            std::vector<uint64_t> array(field_info.array_size);
+            const bool swap = needs_swap_;
             for (size_t i = 0; i < field_info.array_size; i++) {
                 uint64_t value;
                 std::memcpy(&value, data + offset + i * element_size, sizeof(value));
-                if (needsByteSwap()) value = byteSwap64(value);
-                array.push_back(value);
+                array[i] = swap ? byteSwap64(value) : value;
             }
             return array;
         }
         
         case FieldType::FLOAT: {
-            std::vector<float> array;
-            array.reserve(field_info.array_size);
+            std::vector<float> array(field_info.array_size);
+            const bool swap = needs_swap_;
             for (size_t i = 0; i < field_info.array_size; i++) {
-                float value;
-                if (needsByteSwap()) {
+                if (swap) {
                     uint32_t temp;
                     std::memcpy(&temp, data + offset + i * element_size, sizeof(temp));
                     temp = byteSwap32(temp);
-                    std::memcpy(&value, &temp, sizeof(value));
+                    std::memcpy(&array[i], &temp, sizeof(float));
                 } else {
-                    std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                    std::memcpy(&array[i], data + offset + i * element_size, sizeof(float));
                 }
-                array.push_back(value);
             }
             return array;
         }
         
         case FieldType::DOUBLE: {
-            std::vector<double> array;
-            array.reserve(field_info.array_size);
+            std::vector<double> array(field_info.array_size);
+            const bool swap = needs_swap_;
             for (size_t i = 0; i < field_info.array_size; i++) {
-                double value;
-                if (needsByteSwap()) {
+                if (swap) {
                     uint64_t temp;
                     std::memcpy(&temp, data + offset + i * element_size, sizeof(temp));
                     temp = byteSwap64(temp);
-                    std::memcpy(&value, &temp, sizeof(value));
+                    std::memcpy(&array[i], &temp, sizeof(double));
                 } else {
-                    std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                    std::memcpy(&array[i], data + offset + i * element_size, sizeof(double));
                 }
-                array.push_back(value);
             }
             return array;
         }
@@ -326,20 +317,20 @@ std::any BinaryParser::parseBitfield(
         case 2: {
             uint16_t temp;
             std::memcpy(&temp, ptr, sizeof(temp));
-            if (needsByteSwap()) temp = byteSwap16(temp);
+            if (needs_swap_) temp = byteSwap16(temp);
             full_value = temp;
             break;
         }
         case 4: {
             uint32_t temp;
             std::memcpy(&temp, ptr, sizeof(temp));
-            if (needsByteSwap()) temp = byteSwap32(temp);
+            if (needs_swap_) temp = byteSwap32(temp);
             full_value = temp;
             break;
         }
         case 8:
             std::memcpy(&full_value, ptr, sizeof(full_value));
-            if (needsByteSwap()) full_value = byteSwap64(full_value);
+            if (needs_swap_) full_value = byteSwap64(full_value);
             break;
         default:
             throw std::runtime_error("Unsupported bitfield size");
