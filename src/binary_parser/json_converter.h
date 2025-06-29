@@ -21,8 +21,11 @@ public:
                      const JsonConvertOptions& options = JsonConvertOptions());
     
 private:
-    // Convert ParsedField to JsonValue
+    // Convert ParsedField to JsonValue (complex version)
     JsonValue convertField(const ParsedField& field, const JsonConvertOptions& options);
+    
+    // Convert ParsedField to JsonValue (simple version - just values)
+    JsonValue convertFieldSimple(const ParsedField& field);
     
     // Convert std::any value to JsonValue
     JsonValue convertValue(const std::any& value);

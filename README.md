@@ -152,51 +152,18 @@ struct ExampleStruct {
 
 ```json
 {
-  "struct_name": "ExampleStruct",
-  "fields": {
-    "id": {
-      "name": "id",
-      "value": 12345
-    },
-    "position": {
-      "name": "position",
-      "sub_fields": {
-        "x": {
-          "name": "x",
-          "value": 100
-        },
-        "y": {
-          "name": "y",
-          "value": 200
-        }
-      }
-    },
-    "data": {
-      "name": "data",
-      "sub_fields": {
-        "value": {
-          "name": "value",
-          "value": 305419896
-        },
-        "bytes": {
-          "name": "bytes",
-          "value": [120, 86, 52, 18]
-        }
-      }
-    },
-    "flags": {
-      "name": "flags",
-      "value": 5
-    },
-    "mode": {
-      "name": "mode",
-      "value": 31
-    },
-    "name": {
-      "name": "name",
-      "value": "Hello, World!"
-    }
-  }
+  "id": 12345,
+  "position": {
+    "x": 100,
+    "y": 200
+  },
+  "data": {
+    "value": 305419896,
+    "bytes": [120, 86, 52, 18]
+  },
+  "flags": 5,
+  "mode": 31,
+  "name": "Hello, World!"
 }
 ```
 

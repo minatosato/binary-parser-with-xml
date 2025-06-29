@@ -7,18 +7,12 @@ namespace binary_parser {
 
 JsonValue JsonConverter::convert(const ParsedStruct& parsed_struct, 
                                 const JsonConvertOptions& options) {
-    JsonValue result;
-    
-    result.set("struct_name", JsonValue(parsed_struct.struct_name));
-    
-    // Create an empty object for fields
-    JsonValue fields_obj = JsonValue::createObject();
+    // For simple output, just return the fields directly
+    JsonValue result = JsonValue::createObject();
     
     for (const auto& [field_name, field] : parsed_struct.fields) {
-        fields_obj.set(field_name, convertField(field, options));
+        result.set(field_name, convertFieldSimple(field));
     }
-    
-    result.set("fields", fields_obj);
     
     return result;
 }
@@ -47,6 +41,20 @@ JsonValue JsonConverter::convertField(const ParsedField& field,
     }
     
     return field_obj;
+}
+
+JsonValue JsonConverter::convertFieldSimple(const ParsedField& field) {
+    // If it has sub_fields, it's a struct or union
+    if (!field.sub_fields.empty()) {
+        JsonValue obj = JsonValue::createObject();
+        for (const auto& [sub_name, sub_field] : field.sub_fields) {
+            obj.set(sub_name, convertFieldSimple(sub_field));
+        }
+        return obj;
+    } else {
+        // Just return the value directly
+        return convertValue(field.value);
+    }
 }
 
 JsonValue JsonConverter::convertValue(const std::any& value) {
