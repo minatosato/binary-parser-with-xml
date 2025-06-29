@@ -16,7 +16,7 @@ if(NOT tinyxml2_FOUND)
         message(FATAL_ERROR "TinyXML2 not found")
     endif()
 endif()
-find_package(GTest CONFIG REQUIRED)
+find_package(GTest CONFIG)
 
 # Binary parser library
 add_library(binary_parser
@@ -45,16 +45,18 @@ target_link_libraries(parse_binary PRIVATE
 )
 
 # Tests
-enable_testing()
+if(GTest_FOUND)
+    enable_testing()
 
-add_executable(test_binary_parser
-    tests/test_binary_parser.cpp
-)
+    add_executable(test_binary_parser
+        tests/test_binary_parser.cpp
+    )
 
-target_link_libraries(test_binary_parser PRIVATE
-    binary_parser
-    GTest::gtest
-    GTest::gtest_main
-)
+    target_link_libraries(test_binary_parser PRIVATE
+        binary_parser
+        GTest::gtest
+        GTest::gtest_main
+    )
 
-add_test(NAME test_binary_parser COMMAND test_binary_parser)
+    add_test(NAME test_binary_parser COMMAND test_binary_parser)
+endif()
