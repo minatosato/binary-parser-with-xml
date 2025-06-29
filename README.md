@@ -19,6 +19,7 @@ C++でバイナリデータを構造体にキャストする際、構造体定�
 - 再コンパイル不要で構造体定義の変更に対応
 - エンディアン変換サポート
 - ビットフィールド値の抽出
+- JSON形式での出力サポート（自作ミニマルライブラリ使用）
 
 ### 3. サポートする機能
 - ✅ stdint型（uint8_t, int16_t, uint32_t等）
@@ -31,6 +32,8 @@ C++でバイナリデータを構造体にキャストする際、構造体定�
 - ✅ #includeによる複数ヘッダファイル
 - ✅ パック/アンパック（アライメント制御）
 - ✅ エンディアン指定（little/big）
+- ✅ JSON出力（コンパクト/Pretty Print）
+- ✅ ファイル出力
 
 ## 🚀 使い方
 
@@ -47,11 +50,14 @@ python3 src/header_to_xml/header_to_xml.py input.h StructName -o output.xml
 ### 2. バイナリデータを解析
 
 ```bash
-./build/parse_binary output.xml data.bin StructName
+./build/parse_binary output.xml data.bin
 ```
 
 オプション:
 - `--big-endian`: ビッグエンディアンとして解析（デフォルトはリトルエンディアン）
+- `--json`: JSON形式で出力
+- `--pretty`: JSON出力を整形（インデント付き）
+- `-o <file>`: 出力をファイルに保存
 
 ## 🔧 ビルド方法
 
@@ -76,14 +82,18 @@ binary-parser-with-xml/
 ├── src/
 │   ├── header_to_xml/        # Python: ヘッダ→XML変換
 │   │   └── header_to_xml.py
-│   └── binary_parser/        # C++: バイナリパーサー
-│       ├── binary_parser.cpp
-│       ├── binary_parser.h
-│       ├── xml_struct_parser.cpp
-│       ├── xml_struct_parser.h
-│       └── main.cpp
+│   ├── binary_parser/        # C++: バイナリパーサー
+│   │   ├── binary_parser.cpp
+│   │   ├── binary_parser.h
+│   │   ├── xml_struct_parser.cpp
+│   │   ├── xml_struct_parser.h
+│   │   ├── json_converter.cpp
+│   │   ├── json_converter.h
+│   │   └── main.cpp
+│   └── json/                 # C++: JSONライブラリ
+│       ├── json_value.cpp
+│       └── json_value.h
 ├── tests/                    # テストコード
-├── examples/                 # サンプルコード
 ├── docs/                     # ドキュメント
 ├── CMakeLists.txt
 └── README.md
@@ -133,6 +143,61 @@ struct ExampleStruct {
   <field name="mode" type="uint8_t" bits="5" bit_offset="3" offset="12" size="1"/>
   <field name="name" type="char" array_size="32" offset="16" size="32"/>
 </struct>
+```
+
+### JSON出力例
+```bash
+./build/parse_binary example.xml data.bin --json --pretty
+```
+
+```json
+{
+  "struct_name": "ExampleStruct",
+  "fields": {
+    "id": {
+      "name": "id",
+      "value": 12345
+    },
+    "position": {
+      "name": "position",
+      "sub_fields": {
+        "x": {
+          "name": "x",
+          "value": 100
+        },
+        "y": {
+          "name": "y",
+          "value": 200
+        }
+      }
+    },
+    "data": {
+      "name": "data",
+      "sub_fields": {
+        "value": {
+          "name": "value",
+          "value": 305419896
+        },
+        "bytes": {
+          "name": "bytes",
+          "value": [120, 86, 52, 18]
+        }
+      }
+    },
+    "flags": {
+      "name": "flags",
+      "value": 5
+    },
+    "mode": {
+      "name": "mode",
+      "value": 31
+    },
+    "name": {
+      "name": "name",
+      "value": "Hello, World!"
+    }
+  }
+}
 ```
 
 ## 🧪 テスト
