@@ -16,6 +16,18 @@ JsonValue::JsonValue(const char* value) : value_(std::string(value)) {}
 
 JsonValue::JsonValue(const std::string& value) : value_(value) {}
 
+JsonValue JsonValue::createArray() {
+    JsonValue val;
+    val.value_ = std::make_shared<ArrayType>();
+    return val;
+}
+
+JsonValue JsonValue::createObject() {
+    JsonValue val;
+    val.value_ = std::make_shared<ObjectType>();
+    return val;
+}
+
 JsonValue::Type JsonValue::getType() const {
     if (std::holds_alternative<std::nullptr_t>(value_)) return Type::NULL_TYPE;
     if (std::holds_alternative<bool>(value_)) return Type::BOOL;

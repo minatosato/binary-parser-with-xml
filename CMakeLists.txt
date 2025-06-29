@@ -34,6 +34,7 @@ endif()
 set(SOURCES
     src/binary_parser/binary_parser.cpp
     src/binary_parser/xml_struct_parser.cpp
+    src/binary_parser/json_converter.cpp
     src/binary_parser/main.cpp
     src/json/json_value.cpp
 )
@@ -56,6 +57,7 @@ enable_testing()
 # テストソースファイル
 set(TEST_SOURCES
     tests/unit/json/test_json_value.cpp
+    tests/unit/test_json_converter.cpp
     tests/unit/test_binary_parser.cpp
     tests/unit/test_binary_parser_endianness.cpp
     tests/unit/test_binary_parser_logic.cpp
@@ -64,6 +66,7 @@ set(TEST_SOURCES
     src/json/json_value.cpp
     src/binary_parser/binary_parser.cpp
     src/binary_parser/xml_struct_parser.cpp
+    src/binary_parser/json_converter.cpp
 )
 
 # テスト実行ファイルの作成

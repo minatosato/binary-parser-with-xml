@@ -28,6 +28,10 @@ public:
     JsonValue(double value);
     JsonValue(const char* value);
     JsonValue(const std::string& value);
+    
+    // Create empty array or object
+    static JsonValue createArray();
+    static JsonValue createObject();
 
     // 型の取得
     Type getType() const;
