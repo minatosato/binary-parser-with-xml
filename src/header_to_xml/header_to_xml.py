@@ -24,12 +24,14 @@ class HeaderToXMLConverter:
         self.typedef_map = {}
         self.struct_map = {}
         self.processed_files = set()
+        self.macro_map = {}  # For #define expansion
     
     def convert(self, header_file, root_struct_name, packed=False):
         # Reset state for new conversion
         self.typedef_map = {}
         self.struct_map = {}
         self.processed_files = set()
+        self.macro_map = {}
         self._bitfield_state = {}
         
         # Process includes recursively
@@ -86,6 +88,9 @@ class HeaderToXMLConverter:
             content = f.read()
         
         self.struct_map[header_file] = content
+        
+        # Extract macros (#define)
+        self._extract_macros(content)
         
         # Extract typedefs - handle nested braces properly
         # First, find all typedef declarations
@@ -241,18 +246,21 @@ class HeaderToXMLConverter:
                         offset = max_offset
                     last_was_bitfield = False
                     
-                    # Check for array
-                    array_match = re.match(r'(\w+)\s+(\w+)\[(\d+)\]\s*;', line)
+                    # Check for array (now with macro support)
+                    array_match = re.match(r'(\w+)\s+(\w+)\[(\w+)\]\s*;', line)
                     if array_match:
                         field_type, field_name, array_size = array_match.groups()
+                        # Expand macro if it's a macro name
+                        expanded_size = self._expand_macro(array_size)
+                        
                         field_elem = ET.SubElement(parent_elem, 'field')
                         field_elem.set('name', field_name)
                         field_elem.set('type', field_type)
-                        field_elem.set('array_size', array_size)
+                        field_elem.set('array_size', expanded_size)
                         field_elem.set('offset', str(offset))
                         
                         type_size = self.type_sizes.get(field_type, 4)
-                        field_size = type_size * int(array_size)
+                        field_size = type_size * int(expanded_size)
                         field_elem.set('size', str(field_size))
                         
                         if not packed:
@@ -350,13 +358,16 @@ class HeaderToXMLConverter:
                 i = end_idx + 1
                 continue
             
-            # Check for array in union
-            array_match = re.match(r'(\w+)\s+(\w+)\[(\d+)\]\s*;', line)
+            # Check for array in union (with macro support)
+            array_match = re.match(r'(\w+)\s+(\w+)\[(\w+)\]\s*;', line)
             if array_match:
                 field_type, field_name, array_size = array_match.groups()
+                # Expand macro if it's a macro name
+                expanded_size = self._expand_macro(array_size)
+                
                 field_elem = ET.SubElement(union_elem, 'field')
                 field_elem.set('name', field_name)
-                field_elem.set('array_size', array_size)
+                field_elem.set('array_size', expanded_size)
                 field_elem.set('offset', str(0))  # Union fields are relative to union start
                 
                 # Check if array element is typedef
@@ -375,11 +386,11 @@ class HeaderToXMLConverter:
                         element_size = self._parse_struct_body(typedef_info, temp_elem, 0, packed)
                     # Don't expand typedef arrays - just set type
                     field_elem.set('type', field_type)
-                    field_size = element_size * int(array_size)
+                    field_size = element_size * int(expanded_size)
                 else:
                     field_elem.set('type', field_type)
                     type_size = self.type_sizes.get(field_type, 4)
-                    field_size = type_size * int(array_size)
+                    field_size = type_size * int(expanded_size)
                 
                 field_elem.set('size', str(field_size))
                 max_size = max(max_size, field_size)
@@ -463,6 +474,37 @@ class HeaderToXMLConverter:
         if match and match.group(1):
             return match.group(1)
         return 'unnamed'
+    
+    def _extract_macros(self, content):
+        """Extract #define macros from content"""
+        # Simple numeric defines
+        simple_define = r'#define\s+(\w+)\s+(\d+)'
+        for match in re.finditer(simple_define, content):
+            name, value = match.groups()
+            self.macro_map[name] = int(value)
+        
+        # Defines with arithmetic expressions (simple cases)
+        expr_define = r'#define\s+(\w+)\s+\(([^)]+)\)'
+        for match in re.finditer(expr_define, content):
+            name, expr = match.groups()
+            # Try to evaluate simple expressions
+            try:
+                # Replace known macros in expression
+                eval_expr = expr
+                for macro_name, macro_value in self.macro_map.items():
+                    eval_expr = eval_expr.replace(macro_name, str(macro_value))
+                # Only evaluate if it's a simple arithmetic expression
+                if re.match(r'^[\d\s+\-*/()]+$', eval_expr):
+                    value = eval(eval_expr)
+                    self.macro_map[name] = int(value)
+            except:
+                pass  # Skip if can't evaluate
+    
+    def _expand_macro(self, value):
+        """Expand macro if it exists, otherwise return original value"""
+        if value in self.macro_map:
+            return str(self.macro_map[value])
+        return value
     
     def _prettify(self, elem):
         rough_string = ET.tostring(elem, encoding='unicode')
