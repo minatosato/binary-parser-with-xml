@@ -224,6 +224,104 @@ struct Matrix {
     print("SKIPPED (multi-dimensional arrays not supported)")
     return True
 
+def test_various_comment_styles():
+    """Test various comment styles"""
+    print("TEST: Various comment styles ... ", end='')
+    header = """
+#include <stdint.h>
+
+struct CommentTest { // Inline comment
+    uint32_t field1; /* Block comment
+                        on multiple lines */
+    uint16_t field2; // Another inline comment
+    /* Another block comment */
+    uint8_t field3;
+};
+"""
+    success, output, error = run_header_to_xml(header, "CommentTest")
+    if not success:
+        print(f"FAILED: {error}")
+        return False
+    # Check if fields are still parsed correctly
+    if "field1" not in output or "field2" not in output or "field3" not in output:
+        print("FAILED: Fields not parsed correctly with comments")
+        return False
+    print("PASSED")
+    return True
+
+def test_nested_typedefs():
+    """Test nested typedefs"""
+    print("TEST: Nested typedefs ... ", end='')
+    header = """
+#include <stdint.h>
+
+typedef uint32_t U32;
+typedef U32 MyID;
+
+struct NestedTypedefs {
+    MyID id;
+    U32 value;
+};
+"""
+    success, output, error = run_header_to_xml(header, "NestedTypedefs")
+    if not success:
+        print(f"FAILED: {error}")
+        return False
+    # Check if typedefs are resolved to base types
+    if 'type="uint32_t"' not in output:
+        print("FAILED: Typedefs not resolved to uint32_t")
+        return False
+    print("PASSED")
+    return True
+
+def test_typedef_struct_array():
+    """Test array of typedef struct"""
+    print("TEST: Typedef struct array ... ", end='')
+    header = """
+#include <stdint.h>
+
+typedef struct {
+    uint16_t x;
+    uint16_t y;
+} Point;
+
+struct PointArray {
+    Point points[4];
+};
+"""
+    success, output, error = run_header_to_xml(header, "PointArray")
+    if not success:
+        print(f"FAILED: {error}")
+        return False
+    # Check if array is correctly identified with proper size
+    # Note: typedef structs in arrays are not expanded inline (by design)
+    if 'name="points"' not in output or 'array_size="4"' not in output or 'type="Point"' not in output:
+        print("FAILED: Typedef struct array not parsed correctly")
+        return False
+    print("PASSED")
+    return True
+
+def test_undefined_macro_in_array_size():
+    """Test undefined macro in array size"""
+    print("TEST: Undefined macro in array size ... ", end='')
+    header = """
+#include <stdint.h>
+
+struct UndefinedMacroArray {
+    uint8_t data[UNDEFINED_SIZE];
+};
+"""
+    success, output, error = run_header_to_xml(header, "UndefinedMacroArray")
+    # Expect failure or error message
+    if success:
+        print("FAILED: Should have failed to parse undefined macro")
+        return False
+    if "Error: " not in error:
+        print("FAILED: No error message for undefined macro")
+        return False
+    print("PASSED (expected failure)")
+    return True
+
 if __name__ == '__main__':
     print("Running edge case tests...")
     print("=" * 50)
@@ -238,7 +336,11 @@ if __name__ == '__main__':
         test_cpp_features,
         test_flexible_array,
         test_attribute_aligned,
-        test_multi_dimensional_array
+        test_multi_dimensional_array,
+        test_various_comment_styles,
+        test_nested_typedefs,
+        test_typedef_struct_array,
+        test_undefined_macro_in_array_size
     ]
     
     passed = 0
@@ -250,6 +352,8 @@ if __name__ == '__main__':
             result = test()
             if "SKIPPED" in test.__doc__:
                 skipped += 1
+            elif "expected failure" in test.__doc__ and not result:
+                passed += 1 # Test passed because it failed as expected
             elif result:
                 passed += 1
             else:

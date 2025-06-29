@@ -120,6 +120,13 @@ class HeaderToXMLConverter:
             # Find the next typedef
             typedef_match = re.search(r'typedef\s+(struct|union)\s*\{', content[pos:])
             if not typedef_match:
+                # Also check for simple typedefs like typedef int MyInt;
+                simple_typedef_match = re.search(r'typedef\s+(\w+)\s+(\w+)\s*;', content[pos:])
+                if simple_typedef_match:
+                    original_type, new_type = simple_typedef_match.groups()
+                    self.typedef_map[new_type] = original_type
+                    pos += simple_typedef_match.start() + simple_typedef_match.end()
+                    continue
                 break
                 
             start_pos = pos + typedef_match.start()
@@ -273,16 +280,38 @@ class HeaderToXMLConverter:
                         
                         field_elem = ET.SubElement(parent_elem, 'field')
                         field_elem.set('name', field_name)
-                        field_elem.set('type', field_type)
                         field_elem.set('array_size', expanded_size)
                         field_elem.set('offset', str(offset))
                         
-                        type_size = self.type_sizes.get(field_type, 4)
-                        field_size = type_size * int(expanded_size)
+                        # Check if array element is typedef
+                        resolved_type_info = self._resolve_typedef(field_type)
+                        if isinstance(resolved_type_info, tuple):
+                            # It's a typedef struct/union
+                            typedef_type, typedef_body = resolved_type_info
+                            # For arrays of typedef structs, don't expand inline
+                            field_elem.set('type', field_type)
+                            # Calculate element size
+                            temp_elem = ET.Element('temp')
+                            if typedef_type == 'struct':
+                                element_size = self._parse_struct_body(typedef_body, temp_elem, 0, packed)
+                            else:
+                                element_size = self._parse_union_body(typedef_body, temp_elem, 0, packed)
+                            field_size = element_size * int(expanded_size)
+                        else:
+                            # It's a simple type
+                            field_elem.set('type', resolved_type_info)
+                            type_size = self.type_sizes.get(resolved_type_info, 4)
+                            field_size = type_size * int(expanded_size)
+                        
                         field_elem.set('size', str(field_size))
                         
                         if not packed:
-                            offset = self._align_offset(offset + field_size, type_size)
+                            # Get proper alignment
+                            if isinstance(resolved_type_info, tuple):
+                                align_size = self._get_struct_alignment(temp_elem) if 'temp_elem' in locals() else 4
+                            else:
+                                align_size = self.type_sizes.get(resolved_type_info, 4)
+                            offset = self._align_offset(offset + field_size, align_size)
                         else:
                             offset += field_size
                     else:
@@ -295,41 +324,48 @@ class HeaderToXMLConverter:
                             field_elem.set('offset', str(offset))
                             
                             # Check if it's a typedef
-                            if field_type in self.typedef_map:
-                                typedef_info = self.typedef_map[field_type]
-                                if isinstance(typedef_info, tuple):
-                                    typedef_type, typedef_body = typedef_info
-                                    if typedef_type == 'struct':
-                                        struct_elem = ET.SubElement(field_elem, 'struct')
-                                        struct_size = self._parse_struct_body(typedef_body, struct_elem, 0, packed)
-                                    else:  # union
-                                        struct_elem = ET.SubElement(field_elem, 'union')
-                                        struct_size = self._parse_union_body(typedef_body, struct_elem, offset, packed)
-                                else:
-                                    # Old format, assume struct
+                            resolved_type_info = self._resolve_typedef(field_type)
+                            if isinstance(resolved_type_info, tuple):
+                                typedef_type, typedef_body = resolved_type_info
+                                if typedef_type == 'struct':
                                     struct_elem = ET.SubElement(field_elem, 'struct')
-                                    struct_size = self._parse_struct_body(typedef_info, struct_elem, 0, packed)
+                                    struct_size = self._parse_struct_body(typedef_body, struct_elem, 0, packed)
+                                else:  # union
+                                    struct_elem = ET.SubElement(field_elem, 'union')
+                                    struct_size = self._parse_union_body(typedef_body, struct_elem, offset, packed)
                                 field_elem.set('size', str(struct_size))
                                 offset += struct_size
                             else:
-                                # Check if it's a known struct type from includes
-                                struct_found = False
-                                for content in self.struct_map.values():
-                                    # Look for struct definitions
-                                    struct_pattern = rf'struct\s+{field_type}\s*{{'
-                                    if re.search(struct_pattern, content):
-                                        struct_found = True
-                                        # Extract and parse the struct
-                                        full_pattern = rf'struct\s+{field_type}\s*\{{([^\{{\}}]*(?:\{{[^\{{\}}]*\}}[^\{{\}}]*)*)\}}'
-                                        match = re.search(full_pattern, content, re.DOTALL)
-                                        if match:
-                                            struct_elem = ET.SubElement(field_elem, 'struct')
-                                            struct_size = self._parse_struct_body(match.group(1), struct_elem, 0, packed)
-                                            field_elem.set('size', str(struct_size))
-                                            offset += struct_size
-                                        break
+                                # It's a simple typedef, use the resolved base type
+                                field_elem.set('type', resolved_type_info)
+                                type_size = self.type_sizes.get(resolved_type_info, 4)
+                                field_elem.set('size', str(type_size))
                                 
-                                if not struct_found:
+                                if not packed:
+                                    offset = self._align_offset(offset + type_size, type_size)
+                                else:
+                                    offset += type_size
+                        
+                                # Check if it's a known struct type from includes
+                                # Only search for struct if not already resolved as typedef struct/union
+                                struct_found = False
+                                if not isinstance(resolved_type_info, tuple) and resolved_type_info not in self.type_sizes:
+                                    for content in self.struct_map.values():
+                                        # Look for struct definitions
+                                        struct_pattern = rf'struct\s+{field_type}\s*\{{'
+                                        if re.search(struct_pattern, content):
+                                            struct_found = True
+                                            # Extract and parse the struct
+                                            full_pattern = rf'struct\s+{field_type}\s*\{{([^{{}}\]]*(?:\{{[^{{}}\]]*\}}[^{{}}\]*)*)\}}'
+                                            match = re.search(full_pattern, content, re.DOTALL)
+                                            if match:
+                                                struct_elem = ET.SubElement(field_elem, 'struct')
+                                                struct_size = self._parse_struct_body(match.group(1), struct_elem, 0, packed)
+                                                field_elem.set('size', str(struct_size))
+                                                offset += struct_size
+                                            break
+                                
+                                if not struct_found and not isinstance(resolved_type_info, tuple) and resolved_type_info not in self.type_sizes:
                                     field_elem.set('type', field_type)
                                     type_size = self.type_sizes.get(field_type, 4)
                                     field_elem.set('size', str(type_size))
@@ -389,25 +425,21 @@ class HeaderToXMLConverter:
                 field_elem.set('offset', str(0))  # Union fields are relative to union start
                 
                 # Check if array element is typedef
-                if field_type in self.typedef_map:
-                    typedef_info = self.typedef_map[field_type]
-                    if isinstance(typedef_info, tuple):
-                        typedef_type, typedef_body = typedef_info
-                        # For arrays of typedefs, we need to get the size once
-                        temp_elem = ET.Element('temp')
-                        if typedef_type == 'struct':
-                            element_size = self._parse_struct_body(typedef_body, temp_elem, 0, packed)
-                        else:
-                            element_size = self._parse_union_body(typedef_body, temp_elem, 0, packed)
+                resolved_type_info = self._resolve_typedef(field_type)
+                if isinstance(resolved_type_info, tuple):
+                    typedef_type, typedef_body = resolved_type_info
+                    # For arrays of typedefs, we need to get the size once
+                    temp_elem = ET.Element('temp')
+                    if typedef_type == 'struct':
+                        element_size = self._parse_struct_body(typedef_body, temp_elem, 0, packed)
                     else:
-                        temp_elem = ET.Element('temp')
-                        element_size = self._parse_struct_body(typedef_info, temp_elem, 0, packed)
+                        element_size = self._parse_union_body(typedef_body, temp_elem, 0, packed)
                     # Don't expand typedef arrays - just set type
                     field_elem.set('type', field_type)
                     field_size = element_size * int(expanded_size)
                 else:
-                    field_elem.set('type', field_type)
-                    type_size = self.type_sizes.get(field_type, 4)
+                    field_elem.set('type', resolved_type_info)
+                    type_size = self.type_sizes.get(resolved_type_info, 4)
                     field_size = type_size * int(expanded_size)
                 
                 field_elem.set('size', str(field_size))
@@ -422,25 +454,20 @@ class HeaderToXMLConverter:
                 field_elem.set('offset', str(0))  # Union fields are relative to union start
                 
                 # Check if it's a typedef or known struct
-                if field_type in self.typedef_map:
-                    typedef_info = self.typedef_map[field_type]
-                    if isinstance(typedef_info, tuple):
-                        typedef_type, typedef_body = typedef_info
-                        if typedef_type == 'struct':
-                            struct_elem = ET.SubElement(field_elem, 'struct')
-                            struct_size = self._parse_struct_body(typedef_body, struct_elem, 0, packed)
-                        else:  # union
-                            struct_elem = ET.SubElement(field_elem, 'union')
-                            struct_size = self._parse_union_body(typedef_body, struct_elem, current_offset, packed)
-                    else:
-                        # Old format, assume struct
+                resolved_type_info = self._resolve_typedef(field_type)
+                if isinstance(resolved_type_info, tuple):
+                    typedef_type, typedef_body = resolved_type_info
+                    if typedef_type == 'struct':
                         struct_elem = ET.SubElement(field_elem, 'struct')
-                        struct_size = self._parse_struct_body(typedef_info, struct_elem, 0, packed)
+                        struct_size = self._parse_struct_body(typedef_body, struct_elem, 0, packed)
+                    else:  # union
+                        struct_elem = ET.SubElement(field_elem, 'union')
+                        struct_size = self._parse_union_body(typedef_body, struct_elem, current_offset, packed)
                     field_elem.set('size', str(struct_size))
                     max_size = max(max_size, struct_size)
                 else:
-                    field_elem.set('type', field_type)
-                    type_size = self.type_sizes.get(field_type, 4)
+                    field_elem.set('type', resolved_type_info)
+                    type_size = self.type_sizes.get(resolved_type_info, 4)
                     field_elem.set('size', str(type_size))
                     max_size = max(max_size, type_size)
             
@@ -461,6 +488,19 @@ class HeaderToXMLConverter:
             return offset
         return ((offset + alignment - 1) // alignment) * alignment
     
+    def _resolve_typedef(self, type_name):
+        """Recursively resolves a typedef to its base type or struct/union info."""
+        resolved_type = type_name
+        while resolved_type in self.typedef_map:
+            typedef_info = self.typedef_map[resolved_type]
+            if isinstance(typedef_info, tuple):
+                # It's a typedef struct/union, return its info
+                return typedef_info
+            else:
+                # It's a simple typedef, continue resolving
+                resolved_type = typedef_info
+        return resolved_type
+
     def _extract_block(self, lines, start_idx):
         brace_count = 0
         start_found = False
