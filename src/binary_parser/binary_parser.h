@@ -40,6 +40,12 @@ public:
         return std::any_cast<T>(field.value);
     }
     
+    // Get array values
+    template<typename T>
+    static std::vector<T> getArray(const ParsedField& field) {
+        return std::any_cast<std::vector<T>>(field.value);
+    }
+    
 private:
     ParsedField parseField(
         const uint8_t* data,
@@ -49,6 +55,12 @@ private:
     );
     
     std::any parseValue(
+        const uint8_t* data,
+        size_t offset,
+        const FieldInfo& field_info
+    );
+    
+    std::any parseArray(
         const uint8_t* data,
         size_t offset,
         const FieldInfo& field_info

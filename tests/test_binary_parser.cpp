@@ -63,6 +63,50 @@ TEST_F(BinaryParserTest, ParseSimpleStruct) {
     EXPECT_FLOAT_EQ(BinaryParser::getValue<float>(parsed->fields["value"]), value);
 }
 
+TEST_F(BinaryParserTest, ParseStructWithArray) {
+    // Create test XML file with array
+    const char* xml_content = R"(<?xml version="1.0" ?>
+<struct name="ArrayStruct" size="24">
+  <field name="count" type="uint32_t" offset="0" size="4"/>
+  <field name="data" type="uint32_t" offset="4" size="16" array_size="4"/>
+  <field name="checksum" type="uint32_t" offset="20" size="4"/>
+</struct>)";
+    
+    std::ofstream out("test_array_struct.xml");
+    out << xml_content;
+    out.close();
+    
+    // Parse XML
+    XmlStructParser xml_parser;
+    auto struct_info = xml_parser.parse("test_array_struct.xml");
+    ASSERT_NE(struct_info, nullptr);
+    
+    // Create test binary data
+    uint8_t test_data[24];
+    uint32_t count = 4;
+    uint32_t data_array[4] = {10, 20, 30, 40};
+    uint32_t checksum = 100;
+    
+    std::memcpy(test_data + 0, &count, 4);
+    std::memcpy(test_data + 4, data_array, 16);
+    std::memcpy(test_data + 20, &checksum, 4);
+    
+    // Parse binary data
+    BinaryParser parser;
+    auto parsed = parser.parse(test_data, sizeof(test_data), *struct_info);
+    ASSERT_NE(parsed, nullptr);
+    
+    // Verify array values
+    auto array_field = parsed->fields["data"];
+    auto array_values = BinaryParser::getArray<uint32_t>(array_field);
+    ASSERT_EQ(array_values.size(), 4);
+    for (int i = 0; i < 4; i++) {
+        EXPECT_EQ(array_values[i], data_array[i]);
+    }
+    
+    std::remove("test_array_struct.xml");
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

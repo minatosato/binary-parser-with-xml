@@ -45,6 +45,9 @@ ParsedField BinaryParser::parseField(
             parsed_field.sub_fields[sub_field->name] = 
                 parseField(data, data_size, actual_offset, *sub_field);
         }
+    } else if (field_info.array_size > 1) {
+        // Parse array
+        parsed_field.value = parseArray(data, actual_offset, field_info);
     } else {
         // Parse primitive value
         parsed_field.value = parseValue(data, actual_offset, field_info);
@@ -117,6 +120,83 @@ std::any BinaryParser::parseValue(
         
         default:
             throw std::runtime_error("Unsupported field type");
+    }
+}
+
+std::any BinaryParser::parseArray(
+    const uint8_t* data,
+    size_t offset,
+    const FieldInfo& field_info) {
+    
+    size_t element_size = field_info.size / field_info.array_size;
+    
+    switch (field_info.type) {
+        case FieldType::UINT8: {
+            std::vector<uint8_t> array;
+            array.reserve(field_info.array_size);
+            for (size_t i = 0; i < field_info.array_size; i++) {
+                array.push_back(data[offset + i]);
+            }
+            return array;
+        }
+        
+        case FieldType::UINT16: {
+            std::vector<uint16_t> array;
+            array.reserve(field_info.array_size);
+            for (size_t i = 0; i < field_info.array_size; i++) {
+                uint16_t value;
+                std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                array.push_back(value);
+            }
+            return array;
+        }
+        
+        case FieldType::UINT32: {
+            std::vector<uint32_t> array;
+            array.reserve(field_info.array_size);
+            for (size_t i = 0; i < field_info.array_size; i++) {
+                uint32_t value;
+                std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                array.push_back(value);
+            }
+            return array;
+        }
+        
+        case FieldType::UINT64: {
+            std::vector<uint64_t> array;
+            array.reserve(field_info.array_size);
+            for (size_t i = 0; i < field_info.array_size; i++) {
+                uint64_t value;
+                std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                array.push_back(value);
+            }
+            return array;
+        }
+        
+        case FieldType::FLOAT: {
+            std::vector<float> array;
+            array.reserve(field_info.array_size);
+            for (size_t i = 0; i < field_info.array_size; i++) {
+                float value;
+                std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                array.push_back(value);
+            }
+            return array;
+        }
+        
+        case FieldType::DOUBLE: {
+            std::vector<double> array;
+            array.reserve(field_info.array_size);
+            for (size_t i = 0; i < field_info.array_size; i++) {
+                double value;
+                std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                array.push_back(value);
+            }
+            return array;
+        }
+        
+        default:
+            throw std::runtime_error("Unsupported array element type");
     }
 }
 

@@ -216,6 +216,56 @@ class TestHeaderToXMLConverter(unittest.TestCase):
         self.assertEqual(color_field.get('name'), 'color')
         color_struct = color_field.find('struct')
         self.assertIsNotNone(color_struct)
+    
+    def test_anonymous_struct_and_union(self):
+        header_content = """
+        #include <stdint.h>
+        
+        struct AnonymousTest {
+            uint32_t id;
+            struct {
+                uint16_t x;
+                uint16_t y;
+            };  // anonymous struct
+            union {
+                uint32_t raw;
+                struct {
+                    uint8_t r;
+                    uint8_t g;
+                    uint8_t b;
+                    uint8_t a;
+                };
+            };  // anonymous union
+        };
+        """
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+            f.write(header_content)
+            header_file = f.name
+        
+        try:
+            converter = HeaderToXMLConverter()
+            xml_string = converter.convert(header_file, "AnonymousTest")
+            
+            root = ET.fromstring(xml_string)
+            fields = root.findall('field')
+            
+            # Check anonymous struct
+            anon_struct = None
+            for field in fields:
+                if field.find('struct') is not None and field.get('name') == 'unnamed':
+                    anon_struct = field
+                    break
+            
+            self.assertIsNotNone(anon_struct)
+            struct_elem = anon_struct.find('struct')
+            sub_fields = struct_elem.findall('field')
+            self.assertEqual(len(sub_fields), 2)
+            self.assertEqual(sub_fields[0].get('name'), 'x')
+            self.assertEqual(sub_fields[1].get('name'), 'y')
+            
+        finally:
+            os.unlink(header_file)
 
 if __name__ == '__main__':
     unittest.main()

@@ -32,24 +32,36 @@ class HeaderToXMLConverter:
         # Process includes recursively
         self._process_header_file(header_file)
         
-        # Find the struct definition
-        struct_pattern = rf'struct\s+{root_struct_name}\s*{{([^{{}}]*(?:{{[^{{}}]*}}[^{{}}]*)*)}}'  
-        
+        # Find the struct definition  
         match = None
+        struct_body = None
+        
+        # Try to find the struct in each file
         for content in self.struct_map.values():
-            match = re.search(struct_pattern, content, re.DOTALL)
-            if match:
-                break
+            # Use a more robust regex that handles nested structures
+            pattern = rf'struct\s+{root_struct_name}\s*{{'
+            start_match = re.search(pattern, content)
+            
+            if start_match:
+                # Find the matching closing brace
+                start_pos = start_match.end() - 1
+                brace_count = 1
+                pos = start_pos + 1
+                
+                while pos < len(content) and brace_count > 0:
+                    if content[pos] == '{':
+                        brace_count += 1
+                    elif content[pos] == '}':
+                        brace_count -= 1
+                    pos += 1
+                
+                if brace_count == 0:
+                    struct_body = content[start_pos + 1:pos - 1]
+                    match = True
+                    break
         
-        if not match:
-            # Try to find in all processed content
-            all_content = '\n'.join(self.struct_map.values())
-            match = re.search(struct_pattern, all_content, re.DOTALL)
-        
-        if not match:
+        if not match or struct_body is None:
             raise ValueError(f"Struct '{root_struct_name}' not found in header file")
-        
-        struct_body = match.group(1)
         
         root = ET.Element('struct', name=root_struct_name)
         if packed:
@@ -268,8 +280,8 @@ class HeaderToXMLConverter:
         return '\n'.join(body_lines), len(lines) - 1
     
     def _extract_field_name(self, line):
-        match = re.search(r'}\s*(\w+)\s*;', line)
-        if match:
+        match = re.search(r'}\s*(\w*)\s*;', line)
+        if match and match.group(1):
             return match.group(1)
         return 'unnamed'
     
