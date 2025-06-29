@@ -61,7 +61,7 @@ struct Config {
         xml_file = tempfile.mktemp(suffix='.xml')
         result = subprocess.run([
             sys.executable,
-            'src/header_to_xml/header_to_xml.py',
+            '../../src/header_to_xml/header_to_xml.py',
             header_file,
             'Config',
             '-o', xml_file
@@ -86,7 +86,7 @@ struct Config {
         
         # Parse binary
         result = subprocess.run([
-            './build/parse_binary',
+            '../../build/parse_binary',
             xml_file,
             bin_file,
             'Config'
