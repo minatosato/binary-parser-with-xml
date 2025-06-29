@@ -2,8 +2,42 @@
 #include "xml_struct_parser.h"
 #include <cstring>
 #include <stdexcept>
+#include <algorithm>
 
 namespace binary_parser {
+
+// Check system endianness
+static bool isLittleEndian() {
+    uint16_t test = 1;
+    return *reinterpret_cast<uint8_t*>(&test) == 1;
+}
+
+bool BinaryParser::needsByteSwap() const {
+    bool systemIsLittleEndian = isLittleEndian();
+    return (endianness_ == Endianness::LITTLE) != systemIsLittleEndian;
+}
+
+uint16_t BinaryParser::byteSwap16(uint16_t value) {
+    return (value >> 8) | (value << 8);
+}
+
+uint32_t BinaryParser::byteSwap32(uint32_t value) {
+    return ((value >> 24) & 0xFF) |
+           ((value >> 8) & 0xFF00) |
+           ((value << 8) & 0xFF0000) |
+           ((value << 24) & 0xFF000000);
+}
+
+uint64_t BinaryParser::byteSwap64(uint64_t value) {
+    return ((value >> 56) & 0xFFULL) |
+           ((value >> 40) & 0xFF00ULL) |
+           ((value >> 24) & 0xFF0000ULL) |
+           ((value >> 8) & 0xFF000000ULL) |
+           ((value << 8) & 0xFF00000000ULL) |
+           ((value << 24) & 0xFF0000000000ULL) |
+           ((value << 40) & 0xFF000000000000ULL) |
+           ((value << 56) & 0xFF00000000000000ULL);
+}
 
 std::unique_ptr<ParsedStruct> BinaryParser::parse(
     const uint8_t* data,
@@ -76,48 +110,68 @@ std::any BinaryParser::parseValue(
         case FieldType::UINT16: {
             uint16_t value;
             std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) value = byteSwap16(value);
             return value;
         }
         
         case FieldType::INT16: {
             int16_t value;
             std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) value = byteSwap16(value);
             return value;
         }
         
         case FieldType::UINT32: {
             uint32_t value;
             std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) value = byteSwap32(value);
             return value;
         }
         
         case FieldType::INT32: {
             int32_t value;
             std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) value = byteSwap32(value);
             return value;
         }
         
         case FieldType::UINT64: {
             uint64_t value;
             std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) value = byteSwap64(value);
             return value;
         }
         
         case FieldType::INT64: {
             int64_t value;
             std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) value = byteSwap64(value);
             return value;
         }
         
         case FieldType::FLOAT: {
             float value;
-            std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) {
+                uint32_t temp;
+                std::memcpy(&temp, ptr, sizeof(temp));
+                temp = byteSwap32(temp);
+                std::memcpy(&value, &temp, sizeof(value));
+            } else {
+                std::memcpy(&value, ptr, sizeof(value));
+            }
             return value;
         }
         
         case FieldType::DOUBLE: {
             double value;
-            std::memcpy(&value, ptr, sizeof(value));
+            if (needsByteSwap()) {
+                uint64_t temp;
+                std::memcpy(&temp, ptr, sizeof(temp));
+                temp = byteSwap64(temp);
+                std::memcpy(&value, &temp, sizeof(value));
+            } else {
+                std::memcpy(&value, ptr, sizeof(value));
+            }
             return value;
         }
         
@@ -149,6 +203,7 @@ std::any BinaryParser::parseArray(
             for (size_t i = 0; i < field_info.array_size; i++) {
                 uint16_t value;
                 std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                if (needsByteSwap()) value = byteSwap16(value);
                 array.push_back(value);
             }
             return array;
@@ -160,6 +215,7 @@ std::any BinaryParser::parseArray(
             for (size_t i = 0; i < field_info.array_size; i++) {
                 uint32_t value;
                 std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                if (needsByteSwap()) value = byteSwap32(value);
                 array.push_back(value);
             }
             return array;
@@ -171,6 +227,7 @@ std::any BinaryParser::parseArray(
             for (size_t i = 0; i < field_info.array_size; i++) {
                 uint64_t value;
                 std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                if (needsByteSwap()) value = byteSwap64(value);
                 array.push_back(value);
             }
             return array;
@@ -181,7 +238,14 @@ std::any BinaryParser::parseArray(
             array.reserve(field_info.array_size);
             for (size_t i = 0; i < field_info.array_size; i++) {
                 float value;
-                std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                if (needsByteSwap()) {
+                    uint32_t temp;
+                    std::memcpy(&temp, data + offset + i * element_size, sizeof(temp));
+                    temp = byteSwap32(temp);
+                    std::memcpy(&value, &temp, sizeof(value));
+                } else {
+                    std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                }
                 array.push_back(value);
             }
             return array;
@@ -192,7 +256,14 @@ std::any BinaryParser::parseArray(
             array.reserve(field_info.array_size);
             for (size_t i = 0; i < field_info.array_size; i++) {
                 double value;
-                std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                if (needsByteSwap()) {
+                    uint64_t temp;
+                    std::memcpy(&temp, data + offset + i * element_size, sizeof(temp));
+                    temp = byteSwap64(temp);
+                    std::memcpy(&value, &temp, sizeof(value));
+                } else {
+                    std::memcpy(&value, data + offset + i * element_size, sizeof(value));
+                }
                 array.push_back(value);
             }
             return array;
@@ -220,17 +291,20 @@ std::any BinaryParser::parseBitfield(
         case 2: {
             uint16_t temp;
             std::memcpy(&temp, ptr, sizeof(temp));
+            if (needsByteSwap()) temp = byteSwap16(temp);
             full_value = temp;
             break;
         }
         case 4: {
             uint32_t temp;
             std::memcpy(&temp, ptr, sizeof(temp));
+            if (needsByteSwap()) temp = byteSwap32(temp);
             full_value = temp;
             break;
         }
         case 8:
             std::memcpy(&full_value, ptr, sizeof(full_value));
+            if (needsByteSwap()) full_value = byteSwap64(full_value);
             break;
         default:
             throw std::runtime_error("Unsupported bitfield size");

@@ -9,6 +9,11 @@
 
 namespace binary_parser {
 
+enum class Endianness {
+    LITTLE,  // Default
+    BIG
+};
+
 struct StructInfo;
 struct FieldInfo;
 
@@ -25,7 +30,8 @@ struct ParsedStruct {
 
 class BinaryParser {
 public:
-    BinaryParser() = default;
+    BinaryParser(Endianness endianness = Endianness::LITTLE) 
+        : endianness_(endianness) {}
     
     // Parse binary data using struct definition from XML
     std::unique_ptr<ParsedStruct> parse(
@@ -71,6 +77,16 @@ private:
         size_t offset,
         const FieldInfo& field_info
     );
+    
+    // Byte swapping utilities
+    uint16_t byteSwap16(uint16_t value);
+    uint32_t byteSwap32(uint32_t value);
+    uint64_t byteSwap64(uint64_t value);
+    
+    // Check if byte swapping is needed
+    bool needsByteSwap() const;
+    
+    Endianness endianness_;
 };
 
 } // namespace binary_parser

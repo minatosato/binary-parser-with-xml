@@ -6,9 +6,11 @@
 #include "binary_parser.h"
 
 void printUsage(const char* program_name) {
-    std::cout << "Usage: " << program_name << " <xml_file> <binary_file>\n";
+    std::cout << "Usage: " << program_name << " <xml_file> <binary_file> [options]\n";
     std::cout << "  xml_file    : XML struct definition file\n";
     std::cout << "  binary_file : Binary data file to parse\n";
+    std::cout << "\nOptions:\n";
+    std::cout << "  --big-endian, -b  : Parse as big-endian (default: little-endian)\n";
 }
 
 void printParsedField(const binary_parser::ParsedField& field, int indent = 0) {
@@ -52,13 +54,22 @@ void printParsedField(const binary_parser::ParsedField& field, int indent = 0) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
+    if (argc < 3) {
         printUsage(argv[0]);
         return 1;
     }
     
     const char* xml_file = argv[1];
     const char* binary_file = argv[2];
+    
+    // Parse command line options
+    binary_parser::Endianness endianness = binary_parser::Endianness::LITTLE;
+    for (int i = 3; i < argc; i++) {
+        std::string arg(argv[i]);
+        if (arg == "--big-endian" || arg == "-b") {
+            endianness = binary_parser::Endianness::BIG;
+        }
+    }
     
     try {
         // Parse XML struct definition
@@ -83,8 +94,15 @@ int main(int argc, char* argv[]) {
         bin_file.close();
         
         // Parse binary data
-        binary_parser::BinaryParser parser;
+        binary_parser::BinaryParser parser(endianness);
         auto parsed = parser.parse(data.data(), data.size(), *struct_info);
+        
+        if (endianness == binary_parser::Endianness::BIG) {
+            std::cout << "Parsing as big-endian\n";
+        } else {
+            std::cout << "Parsing as little-endian (default)\n";
+        }
+        std::cout << "\n";
         
         std::cout << "Parsed data:\n";
         for (const auto& [name, field] : parsed->fields) {
