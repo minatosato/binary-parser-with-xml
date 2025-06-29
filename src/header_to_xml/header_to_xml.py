@@ -336,38 +336,27 @@ class HeaderToXMLConverter:
                                 field_elem.set('size', str(struct_size))
                                 offset += struct_size
                             else:
-                                # It's a simple typedef, use the resolved base type
-                                field_elem.set('type', resolved_type_info)
-                                type_size = self.type_sizes.get(resolved_type_info, 4)
-                                field_elem.set('size', str(type_size))
-                                
-                                if not packed:
-                                    offset = self._align_offset(offset + type_size, type_size)
-                                else:
-                                    offset += type_size
-                        
                                 # Check if it's a known struct type from includes
-                                # Only search for struct if not already resolved as typedef struct/union
                                 struct_found = False
-                                if not isinstance(resolved_type_info, tuple) and resolved_type_info not in self.type_sizes:
-                                    for content in self.struct_map.values():
-                                        # Look for struct definitions
-                                        struct_pattern = rf'struct\s+{field_type}\s*\{{'
-                                        if re.search(struct_pattern, content):
-                                            struct_found = True
-                                            # Extract and parse the struct
-                                            full_pattern = rf'struct\s+{field_type}\s*\{{([^{{}}\]]*(?:\{{[^{{}}\]]*\}}[^{{}}\]*)*)\}}'
-                                            match = re.search(full_pattern, content, re.DOTALL)
-                                            if match:
-                                                struct_elem = ET.SubElement(field_elem, 'struct')
-                                                struct_size = self._parse_struct_body(match.group(1), struct_elem, 0, packed)
-                                                field_elem.set('size', str(struct_size))
-                                                offset += struct_size
-                                            break
+                                for content in self.struct_map.values():
+                                    # Look for struct definitions
+                                    struct_pattern = rf'struct\s+{field_type}\s*\{{'
+                                    if re.search(struct_pattern, content):
+                                        struct_found = True
+                                        # Extract and parse the struct
+                                        full_pattern = rf'struct\s+{field_type}\s*\{{([^{{}}]*(?:\{{[^{{}}]*\}}[^{{}}]*)*)\}}'
+                                        match = re.search(full_pattern, content, re.DOTALL)
+                                        if match:
+                                            struct_elem = ET.SubElement(field_elem, 'struct')
+                                            struct_size = self._parse_struct_body(match.group(1), struct_elem, 0, packed)
+                                            field_elem.set('size', str(struct_size))
+                                            offset += struct_size
+                                        break
                                 
-                                if not struct_found and not isinstance(resolved_type_info, tuple) and resolved_type_info not in self.type_sizes:
-                                    field_elem.set('type', field_type)
-                                    type_size = self.type_sizes.get(field_type, 4)
+                                if not struct_found:
+                                    # It's a simple typedef or basic type
+                                    field_elem.set('type', resolved_type_info)
+                                    type_size = self.type_sizes.get(resolved_type_info, 4)
                                     field_elem.set('size', str(type_size))
                                     
                                     if not packed:

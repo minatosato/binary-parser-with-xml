@@ -53,6 +53,11 @@ struct Data {
         # timestamp/date+time: 0x0123456789ABCDEF
         f.write(struct.pack('<Q', 0x0123456789ABCDEF))
         
+        # Add padding to match struct alignment (56 bytes total)
+        current_size = f.tell()
+        if current_size < 56:
+            f.write(b'\x00' * (56 - current_size))
+        
         bin_file = f.name
     
     xml_file = None
