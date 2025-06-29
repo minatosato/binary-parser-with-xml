@@ -107,6 +107,7 @@ std::any BinaryParser::parseValue(
     
     switch (field_info.type) {
         case FieldType::UINT8:
+        case FieldType::CHAR:
             return static_cast<uint8_t>(*ptr);
             
         case FieldType::INT8:
@@ -194,7 +195,8 @@ std::any BinaryParser::parseArray(
     size_t element_size = field_info.size / field_info.array_size;
     
     switch (field_info.type) {
-        case FieldType::UINT8: {
+        case FieldType::UINT8:
+        case FieldType::CHAR: {
             std::vector<uint8_t> array;
             array.reserve(field_info.array_size);
             for (size_t i = 0; i < field_info.array_size; i++) {

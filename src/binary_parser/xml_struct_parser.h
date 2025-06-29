@@ -23,6 +23,7 @@ enum class FieldType {
     INT64,
     FLOAT,
     DOUBLE,
+    CHAR,
     STRUCT,
     UNION,
     UNKNOWN
