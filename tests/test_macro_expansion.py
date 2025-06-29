@@ -28,7 +28,7 @@ struct TestStruct {
         # Run header_to_xml.py
         result = subprocess.run([
             sys.executable,
-            '../src/header_to_xml/header_to_xml.py',
+            'src/header_to_xml/header_to_xml.py',
             header_file,
             'TestStruct'
         ], capture_output=True, text=True)
@@ -80,7 +80,7 @@ struct TestStruct {
     try:
         result = subprocess.run([
             sys.executable,
-            '../src/header_to_xml/header_to_xml.py',
+            'src/header_to_xml/header_to_xml.py',
             header_file,
             'TestStruct'
         ], capture_output=True, text=True)
@@ -131,7 +131,7 @@ struct TestStruct {
     try:
         result = subprocess.run([
             sys.executable,
-            '../src/header_to_xml/header_to_xml.py',
+            'src/header_to_xml/header_to_xml.py',
             header_file,
             'TestStruct'
         ], capture_output=True, text=True)
