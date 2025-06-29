@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include "xml_struct_parser.h"
-#include "binary_parser.h"
+#include "binary_parser/xml_struct_parser.h"
+#include "binary_parser/binary_parser.h"
 #include <fstream>
 #include <cstring>
 

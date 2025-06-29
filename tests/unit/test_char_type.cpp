@@ -1,15 +1,10 @@
-#include <iostream>
-#include <cassert>
-#include <cstring>
-#include "binary_parser.h"
-#include "xml_struct_parser.h"
+#include <gtest/gtest.h>
+#include "binary_parser/binary_parser.h"
+#include "binary_parser/xml_struct_parser.h"
 
 using namespace binary_parser;
 
-// Test that char type is correctly parsed
-void test_parse_char_type() {
-    std::cout << "TEST: ParseCharType ... ";
-    
+TEST(CharTypeTest, ParseCharType) {
     // Prepare test data
     uint8_t data[] = {
         'H', 'e', 'l', 'l', 'o'  // "Hello"
@@ -32,31 +27,15 @@ void test_parse_char_type() {
     BinaryParser parser;
     auto result = parser.parse(data, sizeof(data), *struct_info);
     
-    assert(result != nullptr);
-    assert(result->fields.count("text") == 1);
+    ASSERT_NE(result, nullptr);
+    ASSERT_EQ(result->fields.count("text"), 1);
     
     // Should get vector of chars
     auto chars = std::any_cast<std::vector<uint8_t>>(result->fields["text"].value);
-    assert(chars.size() == 5);
-    assert(chars[0] == 'H');
-    assert(chars[1] == 'e');
-    assert(chars[2] == 'l');
-    assert(chars[3] == 'l');
-    assert(chars[4] == 'o');
-    
-    std::cout << "PASSED" << std::endl;
-}
-
-int main() {
-    std::cout << "Running char type tests..." << std::endl;
-    
-    try {
-        test_parse_char_type();
-    } catch (const std::exception& e) {
-        std::cout << "FAILED: " << e.what() << std::endl;
-        return 1;
-    }
-    
-    std::cout << "All tests passed!" << std::endl;
-    return 0;
+    ASSERT_EQ(chars.size(), 5);
+    EXPECT_EQ(chars[0], 'H');
+    EXPECT_EQ(chars[1], 'e');
+    EXPECT_EQ(chars[2], 'l');
+    EXPECT_EQ(chars[3], 'l');
+    EXPECT_EQ(chars[4], 'o');
 }

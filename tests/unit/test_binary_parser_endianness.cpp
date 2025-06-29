@@ -1,15 +1,10 @@
-#include <iostream>
-#include <cassert>
-#include <cstring>
-#include "binary_parser.h"
-#include "xml_struct_parser.h"
+#include <gtest/gtest.h>
+#include "binary_parser/binary_parser.h"
+#include "binary_parser/xml_struct_parser.h"
 
 using namespace binary_parser;
 
-// Simple test framework
-void test_parse_big_endian_uint32() {
-    std::cout << "TEST: ParseBigEndianUint32 ... ";
-    
+TEST(EndiannessTest, ParseBigEndianUint32) {
     // Prepare test data in big endian format
     uint8_t big_endian_data[] = {
         0xDE, 0xAD, 0xBE, 0xEF  // 0xDEADBEEF in big endian
@@ -31,25 +26,9 @@ void test_parse_big_endian_uint32() {
     BinaryParser parser(Endianness::BIG);
     auto result = parser.parse(big_endian_data, sizeof(big_endian_data), *struct_info);
     
-    assert(result != nullptr);
-    assert(result->fields.count("value") == 1);
+    ASSERT_NE(result, nullptr);
+    ASSERT_EQ(result->fields.count("value"), 1);
     
     auto value = std::any_cast<uint32_t>(result->fields["value"].value);
-    assert(value == 0xDEADBEEF);
-    
-    std::cout << "PASSED" << std::endl;
-}
-
-int main() {
-    std::cout << "Running endianness tests..." << std::endl;
-    
-    try {
-        test_parse_big_endian_uint32();
-    } catch (const std::exception& e) {
-        std::cout << "FAILED: " << e.what() << std::endl;
-        return 1;
-    }
-    
-    std::cout << "All tests passed!" << std::endl;
-    return 0;
+    EXPECT_EQ(value, 0xDEADBEEF);
 }

@@ -1,15 +1,10 @@
-#include <iostream>
-#include <cassert>
-#include <cstring>
-#include "binary_parser.h"
-#include "xml_struct_parser.h"
+#include <gtest/gtest.h>
+#include "binary_parser/binary_parser.h"
+#include "binary_parser/xml_struct_parser.h"
 
 using namespace binary_parser;
 
-// Test for signed integer types
-void test_parse_signed_int8() {
-    std::cout << "TEST: ParseSignedInt8 ... ";
-    
+TEST(SignedTypesTest, ParseSignedInt8) {
     // Prepare test data with negative value
     uint8_t data[] = {
         0xFF  // -1 in signed int8
@@ -31,18 +26,14 @@ void test_parse_signed_int8() {
     BinaryParser parser;
     auto result = parser.parse(data, sizeof(data), *struct_info);
     
-    assert(result != nullptr);
-    assert(result->fields.count("value") == 1);
+    ASSERT_NE(result, nullptr);
+    ASSERT_EQ(result->fields.count("value"), 1);
     
     auto value = std::any_cast<int8_t>(result->fields["value"].value);
-    assert(value == -1);
-    
-    std::cout << "PASSED" << std::endl;
+    EXPECT_EQ(value, -1);
 }
 
-void test_parse_signed_int32() {
-    std::cout << "TEST: ParseSignedInt32 ... ";
-    
+TEST(SignedTypesTest, ParseSignedInt32) {
     // Prepare test data with negative value (-123456)
     uint8_t data[] = {
         0xC0, 0x1D, 0xFE, 0xFF  // -123456 in little endian
@@ -64,26 +55,9 @@ void test_parse_signed_int32() {
     BinaryParser parser;
     auto result = parser.parse(data, sizeof(data), *struct_info);
     
-    assert(result != nullptr);
-    assert(result->fields.count("value") == 1);
+    ASSERT_NE(result, nullptr);
+    ASSERT_EQ(result->fields.count("value"), 1);
     
     auto value = std::any_cast<int32_t>(result->fields["value"].value);
-    assert(value == -123456);
-    
-    std::cout << "PASSED" << std::endl;
-}
-
-int main() {
-    std::cout << "Running signed types tests..." << std::endl;
-    
-    try {
-        test_parse_signed_int8();
-        test_parse_signed_int32();
-    } catch (const std::exception& e) {
-        std::cout << "FAILED: " << e.what() << std::endl;
-        return 1;
-    }
-    
-    std::cout << "All tests passed!" << std::endl;
-    return 0;
+    EXPECT_EQ(value, -123456);
 }

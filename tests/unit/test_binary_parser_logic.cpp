@@ -1,6 +1,6 @@
 
 #include <gtest/gtest.h>
-#include "binary_parser.h"
+#include "binary_parser/binary_parser.h"
 
 // BinaryParserクラスのプライベートメソッドにアクセスするためにテスト用の派生クラスを作成
 class BinaryParserTest : public ::testing::Test {
