@@ -34,3 +34,8 @@ test_output/
 
 # vcpkg
 vcpkg_installed/
+
+# Test executables
+test_*
+!test_*.cpp
+!test_*.py
