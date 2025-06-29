@@ -4,6 +4,8 @@
 #include <iomanip>
 #include "xml_struct_parser.h"
 #include "binary_parser.h"
+#include "json_converter.h"
+#include "../json/json_value.h"
 
 void printUsage(const char* program_name) {
     std::cout << "Usage: " << program_name << " <xml_file> <binary_file> [options]\n";
@@ -11,6 +13,8 @@ void printUsage(const char* program_name) {
     std::cout << "  binary_file : Binary data file to parse\n";
     std::cout << "\nOptions:\n";
     std::cout << "  --big-endian, -b  : Parse as big-endian (default: little-endian)\n";
+    std::cout << "  --json            : Output as JSON format\n";
+    std::cout << "  -o <file>         : Output to file instead of stdout\n";
 }
 
 void printParsedField(const binary_parser::ParsedField& field, int indent = 0) {
@@ -96,10 +100,17 @@ int main(int argc, char* argv[]) {
     
     // Parse command line options
     binary_parser::Endianness endianness = binary_parser::Endianness::LITTLE;
+    bool output_json = false;
+    std::string output_file;
+    
     for (int i = 3; i < argc; i++) {
         std::string arg(argv[i]);
         if (arg == "--big-endian" || arg == "-b") {
             endianness = binary_parser::Endianness::BIG;
+        } else if (arg == "--json") {
+            output_json = true;
+        } else if (arg == "-o" && i + 1 < argc) {
+            output_file = argv[++i];
         }
     }
     
@@ -108,8 +119,10 @@ int main(int argc, char* argv[]) {
         binary_parser::XmlStructParser xml_parser;
         auto struct_info = xml_parser.parse(xml_file);
         
-        std::cout << "Loaded struct: " << struct_info->name 
-                  << " (size: " << struct_info->size << " bytes)\n\n";
+        if (!output_json) {
+            std::cout << "Loaded struct: " << struct_info->name 
+                      << " (size: " << struct_info->size << " bytes)\n\n";
+        }
         
         // Read binary file
         std::ifstream bin_file(binary_file, std::ios::binary | std::ios::ate);
@@ -129,16 +142,41 @@ int main(int argc, char* argv[]) {
         binary_parser::BinaryParser parser(endianness);
         auto parsed = parser.parse(data.data(), data.size(), *struct_info);
         
-        if (endianness == binary_parser::Endianness::BIG) {
-            std::cout << "Parsing as big-endian\n";
+        if (output_json) {
+            // Convert to JSON
+            binary_parser::JsonConverter converter;
+            binary_parser::JsonConvertOptions options;
+            options.include_type_info = false;  // Can be made configurable later
+            
+            JsonValue json = converter.convert(*parsed, options);
+            std::string json_str = json.toString();
+            
+            if (!output_file.empty()) {
+                // Write to file
+                std::ofstream out_file(output_file);
+                if (!out_file) {
+                    std::cerr << "Error: Cannot create output file: " << output_file << "\n";
+                    return 1;
+                }
+                out_file << json_str << "\n";
+                out_file.close();
+            } else {
+                // Write to stdout
+                std::cout << json_str << "\n";
+            }
         } else {
-            std::cout << "Parsing as little-endian (default)\n";
-        }
-        std::cout << "\n";
-        
-        std::cout << "Parsed data:\n";
-        for (const auto& [name, field] : parsed->fields) {
-            printParsedField(field);
+            // Traditional output
+            if (endianness == binary_parser::Endianness::BIG) {
+                std::cout << "Parsing as big-endian\n";
+            } else {
+                std::cout << "Parsing as little-endian (default)\n";
+            }
+            std::cout << "\n";
+            
+            std::cout << "Parsed data:\n";
+            for (const auto& [name, field] : parsed->fields) {
+                printParsedField(field);
+            }
         }
         
     } catch (const std::exception& e) {
