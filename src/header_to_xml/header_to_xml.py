@@ -1,5 +1,7 @@
 import re
 import os
+import sys
+import argparse
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 
@@ -128,7 +130,7 @@ class HeaderToXMLConverter:
                 pos = start_pos + 1
         
         # Process includes
-        include_pattern = r'#include\s*["<]([^">]+)[">]'
+        include_pattern = r'#include\s*[\"<]([^\">]+)[\">]'
         for match in re.finditer(include_pattern, content):
             include_file = match.group(1)
             
@@ -292,7 +294,7 @@ class HeaderToXMLConverter:
                                     if re.search(struct_pattern, content):
                                         struct_found = True
                                         # Extract and parse the struct
-                                        full_pattern = rf'struct\s+{field_type}\s*{{([^{{}}]*(?:{{[^{{}}]*}}[^{{}}]*)*)}}'
+                                        full_pattern = rf'struct\s+{field_type}\s*\{{([^\{{\}}]*(?:\{{[^\{{\}}]*\}}[^\{{\}}]*)*)\}}'
                                         match = re.search(full_pattern, content, re.DOTALL)
                                         if match:
                                             struct_elem = ET.SubElement(field_elem, 'struct')
@@ -445,3 +447,31 @@ class HeaderToXMLConverter:
         rough_string = ET.tostring(elem, encoding='unicode')
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="  ", encoding=None).strip()
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Convert C++ header struct to XML')
+    parser.add_argument('header_file', help='Input header file path')
+    parser.add_argument('struct_name', help='Root struct or union name to convert')
+    parser.add_argument('-p', '--packed', action='store_true', help='Use packed alignment')
+    parser.add_argument('-o', '--output', help='Output XML file name')
+    
+    args = parser.parse_args()
+    
+    converter = HeaderToXMLConverter()
+    try:
+        xml_content = converter.convert(args.header_file, args.struct_name, args.packed)
+        
+        if args.output:
+            with open(args.output, 'w') as f:
+                f.write(xml_content)
+        else:
+            print(xml_content)
+            
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
