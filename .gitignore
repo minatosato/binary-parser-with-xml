@@ -1,0 +1,36 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Compiled files
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.a
+*.so
+*.dylib
+*.dll
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# XML output files (for testing)
+test_output/
+*.xml.tmp
+
+# vcpkg
+vcpkg_installed/
