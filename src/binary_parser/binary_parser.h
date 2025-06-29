@@ -51,8 +51,8 @@ public:
     static std::vector<T> getArray(const ParsedField& field) {
         return std::any_cast<std::vector<T>>(field.value);
     }
-    
-private:
+
+    // --- Functions moved for testing ---
     ParsedField parseField(
         const uint8_t* data,
         size_t data_size,
@@ -79,14 +79,15 @@ private:
         const FieldInfo& field_info
     );
     
+    // Check if byte swapping is needed
+    bool needsByteSwap() const;
+
     // Byte swapping utilities
     uint16_t byteSwap16(uint16_t value);
     uint32_t byteSwap32(uint32_t value);
     uint64_t byteSwap64(uint64_t value);
-    
-    // Check if byte swapping is needed
-    bool needsByteSwap() const;
-    
+
+private:
     Endianness endianness_;
 };
 

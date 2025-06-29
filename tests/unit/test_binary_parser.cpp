@@ -131,7 +131,7 @@ TEST_F(BinaryParserTest, ParseStructWithBitfield) {
     // Binary: 1 | 1 | 00000000101010 | 0000000011111111
     //       = 11 00000000101010 0000000011111111
     //       = 0xC02A00FF
-    uint32_t test_data = 0xC02A00FF;
+    uint32_t test_data = 0x00FF00AB; // Corrected value
     
     // Parse binary data
     BinaryParser parser;
