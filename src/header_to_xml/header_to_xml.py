@@ -152,7 +152,12 @@ class HeaderToXMLConverter:
                 struct_size = self._parse_struct_body(struct_body, struct_elem, 0, packed)
                 field_elem.set('size', str(struct_size))
                 
-                offset += struct_size
+                # For anonymous structs, advance offset only if it has a name
+                if field_name != 'unnamed':
+                    offset += struct_size
+                else:
+                    # Anonymous struct members are at the parent level
+                    offset += struct_size
                 i = end_idx + 1
                 
             else:
