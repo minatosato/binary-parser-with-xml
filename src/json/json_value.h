@@ -9,6 +9,9 @@
 
 class JsonValue {
 public:
+    using ArrayType = std::vector<std::shared_ptr<JsonValue>>;
+    using ObjectType = std::map<std::string, std::shared_ptr<JsonValue>>;
+
     enum class Type {
         NULL_TYPE,
         BOOL,
@@ -32,9 +35,30 @@ public:
     // 文字列への変換
     std::string toString() const;
 
+    // 配列操作
+    void pushBack(const JsonValue& value);
+    size_t size() const;
+    JsonValue& operator[](size_t index);
+    const JsonValue& operator[](size_t index) const;
+
+    // オブジェクト操作
+    void set(const std::string& key, const JsonValue& value);
+    bool contains(const std::string& key) const;
+    JsonValue& operator[](const std::string& key);
+    const JsonValue& operator[](const std::string& key) const;
+
+    // ファイル操作
+    static JsonValue parseFile(const std::string& filename);
+    void writeToFile(const std::string& filename) const;
+
+    // 値の取得
+    bool getBool() const;
+    double getNumber() const;
+    std::string getString() const;
+    const ArrayType& getArray() const;
+    const ObjectType& getObject() const;
+
 private:
-    using ArrayType = std::vector<std::shared_ptr<JsonValue>>;
-    using ObjectType = std::map<std::string, std::shared_ptr<JsonValue>>;
     using ValueType = std::variant<
         std::nullptr_t,
         bool,
