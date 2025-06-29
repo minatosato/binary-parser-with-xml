@@ -477,28 +477,64 @@ class HeaderToXMLConverter:
     
     def _extract_macros(self, content):
         """Extract #define macros from content"""
-        # Simple numeric defines
-        simple_define = r'#define\s+(\w+)\s+(\d+)'
-        for match in re.finditer(simple_define, content):
-            name, value = match.groups()
-            self.macro_map[name] = int(value)
+        # Process defines in order (important for dependent macros)
+        lines = content.split('\n')
         
-        # Defines with arithmetic expressions (simple cases)
-        expr_define = r'#define\s+(\w+)\s+\(([^)]+)\)'
-        for match in re.finditer(expr_define, content):
-            name, expr = match.groups()
-            # Try to evaluate simple expressions
-            try:
-                # Replace known macros in expression
-                eval_expr = expr
-                for macro_name, macro_value in self.macro_map.items():
-                    eval_expr = eval_expr.replace(macro_name, str(macro_value))
-                # Only evaluate if it's a simple arithmetic expression
-                if re.match(r'^[\d\s+\-*/()]+$', eval_expr):
-                    value = eval(eval_expr)
-                    self.macro_map[name] = int(value)
-            except:
-                pass  # Skip if can't evaluate
+        for line in lines:
+            line = line.strip()
+            if not line.startswith('#define'):
+                continue
+                
+            # Simple numeric defines
+            simple_match = re.match(r'#define\s+(\w+)\s+(\d+)', line)
+            if simple_match:
+                name, value = simple_match.groups()
+                self.macro_map[name] = int(value)
+                continue
+            
+            # Defines with arithmetic expressions
+            expr_match = re.match(r'#define\s+(\w+)\s+\(([^)]+)\)', line)
+            if expr_match:
+                name, expr = expr_match.groups()
+                evaluated = self._evaluate_macro_expression(expr)
+                if evaluated is not None:
+                    self.macro_map[name] = evaluated
+                continue
+                
+            # Defines referencing other macros (no parentheses)
+            ref_match = re.match(r'#define\s+(\w+)\s+(\w+)', line)
+            if ref_match:
+                name, ref = ref_match.groups()
+                if ref in self.macro_map:
+                    self.macro_map[name] = self.macro_map[ref]
+    
+    def _evaluate_macro_expression(self, expr):
+        """Safely evaluate simple arithmetic expressions"""
+        try:
+            # Replace known macros in expression
+            eval_expr = expr
+            for macro_name, macro_value in sorted(self.macro_map.items(), 
+                                                 key=lambda x: len(x[0]), reverse=True):
+                eval_expr = re.sub(r'\b' + macro_name + r'\b', str(macro_value), eval_expr)
+            
+            # Only allow numbers, operators, and parentheses
+            if not re.match(r'^[\d\s+\-*/()]+$', eval_expr):
+                return None
+                
+            # Safe evaluation using ast
+            import ast
+            node = ast.parse(eval_expr, mode='eval')
+            # Only allow safe operations
+            for n in ast.walk(node):
+                if not isinstance(n, (ast.Expression, ast.BinOp, ast.UnaryOp, 
+                                    ast.Num, ast.Constant, ast.Add, ast.Sub, 
+                                    ast.Mult, ast.Div, ast.USub)):
+                    return None
+            
+            result = eval(compile(node, '<string>', 'eval'))
+            return int(result)
+        except:
+            return None
     
     def _expand_macro(self, value):
         """Expand macro if it exists, otherwise return original value"""
