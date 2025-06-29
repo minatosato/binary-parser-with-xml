@@ -40,30 +40,48 @@ class HeaderToXMLConverter:
         # Find the struct definition  
         match = None
         struct_body = None
+        is_typedef = False
         
-        # Try to find the struct in each file
-        for content in self.struct_map.values():
-            # Use a more robust regex that handles nested structures
-            pattern = rf'struct\s+{root_struct_name}\s*{{'
-            start_match = re.search(pattern, content)
-            
-            if start_match:
-                # Find the matching closing brace
-                start_pos = start_match.end() - 1
-                brace_count = 1
-                pos = start_pos + 1
-                
-                while pos < len(content) and brace_count > 0:
-                    if content[pos] == '{':
-                        brace_count += 1
-                    elif content[pos] == '}':
-                        brace_count -= 1
-                    pos += 1
-                
-                if brace_count == 0:
-                    struct_body = content[start_pos + 1:pos - 1]
+        # First check if it's a typedef
+        if root_struct_name in self.typedef_map:
+            typedef_info = self.typedef_map[root_struct_name]
+            if isinstance(typedef_info, tuple):
+                typedef_type, struct_body = typedef_info
+                if typedef_type == 'struct':
                     match = True
-                    break
+                    is_typedef = True
+                else:
+                    raise ValueError(f"'{root_struct_name}' is a typedef union, not a struct")
+            else:
+                # Old format compatibility
+                struct_body = typedef_info
+                match = True
+                is_typedef = True
+        
+        # If not found as typedef, try to find as regular struct
+        if not match:
+            for content in self.struct_map.values():
+                # Use a more robust regex that handles nested structures
+                pattern = rf'struct\s+{root_struct_name}\s*{{'
+                start_match = re.search(pattern, content)
+                
+                if start_match:
+                    # Find the matching closing brace
+                    start_pos = start_match.end() - 1
+                    brace_count = 1
+                    pos = start_pos + 1
+                    
+                    while pos < len(content) and brace_count > 0:
+                        if content[pos] == '{':
+                            brace_count += 1
+                        elif content[pos] == '}':
+                            brace_count -= 1
+                        pos += 1
+                    
+                    if brace_count == 0:
+                        struct_body = content[start_pos + 1:pos - 1]
+                        match = True
+                        break
         
         if not match or struct_body is None:
             raise ValueError(f"Struct '{root_struct_name}' not found in header file")
